@@ -5,65 +5,69 @@ import (
 	"net/http"
 	"net/url"
 	"shortURL/internal/keygen"
-	"strings"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 var (
-	BaseURL = make(map[string]string)
+	baseURL = make(map[string]string)
+	key     string
 )
 
-func ShortenerURL(w http.ResponseWriter, r *http.Request) {
-	var key string
-	switch r.Method {
-	case http.MethodPost:
-		Url, err := io.ReadAll(r.Body)
+func NewRouter() chi.Router {
+	r := chi.NewRouter()
+
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+		bytes, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, err.Error(), 500)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		fURL := string(Url)
+		fURL := string(bytes)
 		_, err = url.Parse(fURL)
 		if err != nil {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 			return
 		}
-		for key, addr := range BaseURL {
-			if addr == fURL {
-				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-				w.WriteHeader(http.StatusCreated)
-				w.Write([]byte(key))
-				return
-			}
-		}
-		for {
-			key = keygen.RandomStr()
-			_, err := BaseURL[key]
-			if !err {
-				break
-			}
-		}
-
-		BaseURL[key] = fURL
+		key := SetShortURL(fURL)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://localhost:8080/" + key))
-	case http.MethodGet:
-		key = r.URL.Path
-		_, err := url.Parse(key)
-		if err != nil {
+		w.Write([]byte("http://" + r.Host + "/" + key))
+	})
+	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
+		key := chi.URLParam(r, "id")
+		address := RetFullURL(key)
+		if address == "" {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
-			return
 		}
-		key = strings.TrimPrefix(key, "/")
-		addr, isExist := BaseURL[key]
-		if !isExist {
-			http.Error(w, "Wrong address!", http.StatusBadRequest)
-			return
+		http.Redirect(w, r, address, http.StatusTemporaryRedirect)
+	})
+	return r
+}
+
+func SetShortURL(fURL string) string {
+
+	for key, addr := range baseURL {
+		if addr == fURL {
+			return key
 		}
-		http.Redirect(w, r, addr, http.StatusTemporaryRedirect)
-	default:
-		http.Error(w, "Wrong request!", http.StatusBadRequest)
-		return
+	}
+	for {
+		key = keygen.RandomStr()
+		_, err := baseURL[key]
+		if !err {
+			break
+		}
 	}
 
+	baseURL[key] = fURL
+	return key
+}
+
+func RetFullURL(key string) string {
+	return baseURL[key]
 }
