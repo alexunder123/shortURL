@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,38 +36,65 @@ func TestRouter(t *testing.T) {
 				statusCode2: 307,
 			},
 		},
+		{
+			name:    "test #2",
+			request: []byte(`/github.com/Yandex-Practicum/go-autotests`),
+			want: want{
+				contentType: "application/json; charset=utf-8",
+				statusCode1: 201,
+				statusCode2: 307,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			//POST
-			request1, err := http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
-			require.NoError(t, err)
+			var request1 *http.Request
+			var err error
+			switch tt.want.contentType {
+			case "text/plain; charset=utf-8":
+				request1, err = http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
+				require.NoError(t, err)
+			case "application/json; charset=utf-8":
+				var req PostURL
+				req.GetURL = string(tt.request)
+				reqBz, err := json.Marshal(req)
+				if err != nil {
+					panic(err)
+				}
+				request1, err = http.NewRequest(http.MethodPost, ts.URL+"/api/shorten", bytes.NewReader(reqBz))
+				require.NoError(t, err)
+			}
 
 			result, err := http.DefaultClient.Do(request1)
 			require.NoError(t, err)
-			// w := httptest.NewRecorder()
-			// h := http.HandlerFunc(ShortenerURL)
-			// h(w, request)
-			// result := w.Result()
 			assert.Equal(t, tt.want.statusCode1, result.StatusCode)
 			assert.Equal(t, tt.want.contentType, result.Header.Get("Content-Type"))
 			userResult, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 			err = result.Body.Close()
 			require.NoError(t, err)
-			
+
 			//GET
-			request2, err := http.NewRequest(http.MethodGet, string(userResult), nil)
-			require.NoError(t, err)
+			var request2 *http.Request
+			switch tt.want.contentType {
+			case "text/plain; charset=utf-8":
+				request2, err = http.NewRequest(http.MethodGet, string(userResult), nil)
+				require.NoError(t, err)
+			case "application/json; charset=utf-8":
+				var res PostURL
+				err := json.Unmarshal(userResult, &res)
+				if err != nil {
+					panic(err)
+				}
+				request2, err = http.NewRequest(http.MethodGet, res.SetURL, nil)
+				require.NoError(t, err)
+			}
 
 			result2, err := http.DefaultTransport.RoundTrip(request2)
 			require.NoError(t, err)
-			// w2 := httptest.NewRecorder()
-			// h2 := http.HandlerFunc(ShortenerURL)
-			// h2(w2, request2)
-			// result2 := w2.Result()
 			userResult2 := result2.Header.Get("Location")
 			err = result2.Body.Close()
 			require.NoError(t, err)
