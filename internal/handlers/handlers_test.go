@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"shortURL/internal/app"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestRouter(t *testing.T) {
-	r := NewRouter()
+	Params := app.GetEnv()
+	r := NewRouter(Params)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 

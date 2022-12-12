@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"shortURL/internal/app"
 	"shortURL/internal/keygen"
 	"sync"
 
@@ -22,7 +23,7 @@ type PostURL struct {
 	SetURL string `json:"result,omitempty"`
 }
 
-func NewRouter() chi.Router {
+func NewRouter(Params *app.Param) chi.Router {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -46,7 +47,7 @@ func NewRouter() chi.Router {
 			return
 		}
 		key := SetShortURL(Addr.GetURL)
-		NewAddr := PostURL{SetURL: "http://" + r.Host + "/" + key}
+		NewAddr := PostURL{SetURL: Params.URL + key}
 		NewAddrBZ, err := json.Marshal(NewAddr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -73,7 +74,7 @@ func NewRouter() chi.Router {
 		key := SetShortURL(fURL)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("http://" + r.Host + "/" + key))
+		w.Write([]byte(Params.URL + key))
 	})
 
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
