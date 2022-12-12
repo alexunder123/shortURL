@@ -25,7 +25,7 @@ func GetEnv() *Param {
 		Params.Server = "127.0.0.1:8080"
 	}
 	if Params.URL == "" {
-		Params.URL = "http://" + Params.Server
+		Params.URL = "http://" + Params.Server + "/"
 	}
 	return &Params
 }

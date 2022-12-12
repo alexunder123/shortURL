@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
-	"testing"
 	"shortURL/internal/app"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +18,17 @@ import (
 func TestRouter(t *testing.T) {
 	Params := app.GetEnv()
 	r := NewRouter(Params)
-	ts := httptest.NewServer(r)
+
+	l, err := net.Listen("tcp", Params.Server)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ts := httptest.NewUnstartedServer(r)
+	ts.Listener.Close()
+	ts.Listener = l
+	ts.Start()
+
 	defer ts.Close()
 
 	type want struct {
