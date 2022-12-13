@@ -14,9 +14,6 @@ type Param struct {
 func GetEnv() *Param {
 	var Params Param
 
-	// os.Setenv("SERVER_ADDRESS", "127.0.0.1:8080")
-	// os.Setenv("BASE_URL", "http://127.0.0.1:8080/")
-
 	err := env.Parse(&Params)
 	if err != nil {
 		log.Fatal(err)
@@ -25,7 +22,7 @@ func GetEnv() *Param {
 		Params.Server = "127.0.0.1:8080"
 	}
 	if Params.URL == "" {
-		Params.URL = "http://" + Params.Server + "/"
+		Params.URL = "http://" + Params.Server
 	}
 	return &Params
 }

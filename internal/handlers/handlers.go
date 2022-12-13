@@ -47,7 +47,7 @@ func NewRouter(Params *app.Param) chi.Router {
 			return
 		}
 		key := SetShortURL(Addr.GetURL)
-		NewAddr := PostURL{SetURL: Params.URL + key}
+		NewAddr := PostURL{SetURL: Params.URL + "/" + key}
 		NewAddrBZ, err := json.Marshal(NewAddr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -74,7 +74,7 @@ func NewRouter(Params *app.Param) chi.Router {
 		key := SetShortURL(fURL)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(Params.URL + key))
+		w.Write([]byte(Params.URL + "/" + key))
 	})
 
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
