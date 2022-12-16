@@ -7,8 +7,9 @@ import (
 )
 
 type Param struct {
-	Server string `env:"SERVER_ADDRESS"`
-	URL    string `env:"BASE_URL"`
+	Server  string `env:"SERVER_ADDRESS"`
+	URL     string `env:"BASE_URL"`
+	Storage string `env:"FILE_STORAGE_PATH"`
 }
 
 func GetEnv() *Param {
@@ -25,4 +26,17 @@ func GetEnv() *Param {
 		Params.URL = "http://" + Params.Server
 	}
 	return &Params
+}
+
+func (P *Param) OpenDB() {
+	if P.Storage == "" {
+		return
+	}
+	file, err := NewReaderDB(P)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer file.Close()
+	file.ReadDB()
 }

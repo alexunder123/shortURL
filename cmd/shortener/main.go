@@ -9,6 +9,7 @@ import (
 
 func main() {
 	Params := app.GetEnv()
+	Params.OpenDB()
 	r := handlers.NewRouter(Params)
 
 	log.Fatal(http.ListenAndServe(Params.Server, r))

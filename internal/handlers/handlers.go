@@ -6,16 +6,9 @@ import (
 	"net/http"
 	"net/url"
 	"shortURL/internal/app"
-	"shortURL/internal/keygen"
-	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-)
-
-var (
-	baseURL = make(map[string]string)
-	key     string
 )
 
 type PostURL struct {
@@ -46,7 +39,7 @@ func NewRouter(Params *app.Param) chi.Router {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 			return
 		}
-		key := SetShortURL(Addr.GetURL)
+		key := SetShortURL(Addr.GetURL, Params)
 		NewAddr := PostURL{SetURL: Params.URL + "/" + key}
 		NewAddrBZ, err := json.Marshal(NewAddr)
 		if err != nil {
@@ -71,7 +64,7 @@ func NewRouter(Params *app.Param) chi.Router {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 			return
 		}
-		key := SetShortURL(fURL)
+		key := SetShortURL(fURL, Params)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(Params.URL + "/" + key))
@@ -86,29 +79,4 @@ func NewRouter(Params *app.Param) chi.Router {
 		http.Redirect(w, r, address, http.StatusTemporaryRedirect)
 	})
 	return r
-}
-
-func SetShortURL(fURL string) string {
-
-	for key, addr := range baseURL {
-		if addr == fURL {
-			return key
-		}
-	}
-	for {
-		key = keygen.RandomStr()
-		_, err := baseURL[key]
-		if !err {
-			break
-		}
-	}
-	var mutex sync.Mutex
-	mutex.Lock()
-	baseURL[key] = fURL
-	mutex.Unlock()
-	return key
-}
-
-func RetFullURL(key string) string {
-	return baseURL[key]
 }
