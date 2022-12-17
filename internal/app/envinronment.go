@@ -20,12 +20,14 @@ func GetEnv() *Param {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if Params.Server == "" {
-		Params.Server = "127.0.0.1:8080"
-	}
-	if Params.URL == "" {
-		Params.URL = "http://" + Params.Server
-	}
+	ReadFlags(&Params)
+
+	// if Params.Server == "" {
+	// 	Params.Server = "127.0.0.1:8080"
+	// }
+	// if Params.URL == "" {
+	// 	Params.URL = "http://" + Params.Server
+	// }
 	return &Params
 }
 
