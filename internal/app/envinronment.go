@@ -10,6 +10,7 @@ type Param struct {
 	Server  string `env:"SERVER_ADDRESS"`
 	URL     string `env:"BASE_URL"`
 	Storage string `env:"FILE_STORAGE_PATH"`
+	SaveDB  bool
 }
 
 func GetEnv() *Param {
@@ -39,4 +40,5 @@ func (P *Param) OpenDB() {
 	}
 	defer file.Close()
 	file.ReadDB()
+	P.SaveDB = true
 }

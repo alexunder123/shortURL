@@ -25,7 +25,6 @@ func NewRouter(Params *app.Param) chi.Router {
 	r.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
 		var Addr PostURL
 		bytes, err := io.ReadAll(r.Body)
-		defer r.Body.Close()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -53,7 +52,6 @@ func NewRouter(Params *app.Param) chi.Router {
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		bytes, err := io.ReadAll(r.Body)
-		defer r.Body.Close()
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

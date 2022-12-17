@@ -2,9 +2,10 @@ package handlers
 
 import (
 	"log"
+	"math/rand"
 	"shortURL/internal/app"
-	"shortURL/internal/keygen"
 	"sync"
+	"time"
 )
 
 var (
@@ -19,7 +20,7 @@ func SetShortURL(fURL string, Params *app.Param) string {
 		}
 	}
 	for {
-		key = keygen.RandomStr()
+		key = RandomStr()
 		_, err := baseURL[key]
 		if !err {
 			break
@@ -29,16 +30,29 @@ func SetShortURL(fURL string, Params *app.Param) string {
 	var mutex sync.Mutex
 	mutex.Lock()
 	baseURL[key] = fURL
-	file, err := app.NewWriterDB(Params)
-	if err != nil {
-		log.Fatal(err)
+	if Params.SaveDB {
+		file, err := app.NewWriterDB(Params)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer file.Close()
+		file.WriteDB(key, fURL)
 	}
-	defer file.Close()
-	file.WriteDB(key, fURL)
 	mutex.Unlock()
 	return key
 }
 
 func RetFullURL(key string) string {
 	return baseURL[key]
+}
+
+func RandomStr() string {
+	const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	n := 6
+	bts := make([]byte, n)
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < n; i++ {
+		bts[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(bts)
 }
