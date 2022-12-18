@@ -9,19 +9,18 @@ import (
 )
 
 var (
-	baseURL = make(map[string]string)
-	key     string
+	key string
 )
 
 func SetShortURL(fURL string, Params *app.Param) string {
-	for key, addr := range baseURL {
+	for key, addr := range app.BaseURL {
 		if addr == fURL {
 			return key
 		}
 	}
 	for {
 		key = RandomStr()
-		_, err := baseURL[key]
+		_, err := app.BaseURL[key]
 		if !err {
 			break
 		}
@@ -29,7 +28,7 @@ func SetShortURL(fURL string, Params *app.Param) string {
 
 	var mutex sync.Mutex
 	mutex.Lock()
-	baseURL[key] = fURL
+	app.BaseURL[key] = fURL
 	if Params.SaveDB {
 		file, err := app.NewWriterDB(Params)
 		if err != nil {
@@ -43,7 +42,7 @@ func SetShortURL(fURL string, Params *app.Param) string {
 }
 
 func RetFullURL(key string) string {
-	return baseURL[key]
+	return app.BaseURL[key]
 }
 
 func RandomStr() string {

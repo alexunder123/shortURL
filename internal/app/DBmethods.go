@@ -7,12 +7,8 @@ import (
 )
 
 var (
-	localBase DB
+	BaseURL = make(map[string]string)
 )
-
-type DB struct {
-	BaseURL map[string]string
-}
 
 type DBstring struct {
 	Key   string `json:"key"`
@@ -49,7 +45,7 @@ func (r *readerDB) ReadDB() {
 			log.Println(err)
 			return
 		}
-		localBase.BaseURL[t.Key] = t.Value
+		BaseURL[t.Key] = t.Value
 	}
 }
 
