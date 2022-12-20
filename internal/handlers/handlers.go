@@ -16,11 +16,12 @@ type PostURL struct {
 	SetURL string `json:"result,omitempty"`
 }
 
-func NewRouter(Params *app.Param) chi.Router {
+func NewRouter(Params *app.Param) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(Decompress)
 
 	r.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
 		var Addr PostURL
