@@ -79,10 +79,6 @@ func Decompress(next http.Handler) http.Handler {
 			}
 			decompressed := gz
 			defer gz.Close()
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
 			r.Body = io.NopCloser(decompressed)
 			next.ServeHTTP(w, r)
 			return
