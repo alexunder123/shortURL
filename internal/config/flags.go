@@ -1,6 +1,8 @@
-package app
+package config
 
-import "flag"
+import (
+	"flag"
+)
 
 func ReadFlags(P *Param) {
 	if P.Server == "" {
@@ -10,7 +12,7 @@ func ReadFlags(P *Param) {
 		flag.StringVar(&P.URL, "b", "http://127.0.0.1:8080", "Базовый адрес результирующего URL")
 	}
 	if P.Storage == "" {
-		flag.StringVar(&P.Storage, "f", "jsonDB.json", "Хранилище URL")
+		flag.StringVar(&P.Storage, "f", "", "Хранилище URL")
 	}
 	flag.Parse()
 }

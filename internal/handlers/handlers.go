@@ -5,7 +5,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"shortURL/internal/app"
+	"shortURL/internal/config"
+	"shortURL/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -16,7 +17,7 @@ type PostURL struct {
 	SetURL string `json:"result,omitempty"`
 }
 
-func NewRouter(Params *app.Param) *chi.Mux {
+func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Logger)
@@ -39,8 +40,8 @@ func NewRouter(Params *app.Param) *chi.Mux {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 			return
 		}
-		key := SetShortURL(Addr.GetURL, Params)
-		NewAddr := PostURL{SetURL: Params.URL + "/" + key}
+		key := S.SetShortURL(Addr.GetURL, P)
+		NewAddr := PostURL{SetURL: P.URL + "/" + key}
 		NewAddrBZ, err := json.Marshal(NewAddr)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -63,15 +64,15 @@ func NewRouter(Params *app.Param) *chi.Mux {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 			return
 		}
-		key := SetShortURL(fURL, Params)
+		key := S.SetShortURL(fURL, P)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(Params.URL + "/" + key))
+		w.Write([]byte(P.URL + "/" + key))
 	})
 
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 		key := chi.URLParam(r, "id")
-		address := RetFullURL(key)
+		address := S.RetFullURL(key)
 		if address == "" {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 		}

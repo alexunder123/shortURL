@@ -2,63 +2,11 @@ package handlers
 
 import (
 	"compress/gzip"
-	"fmt"
 
-	"crypto/md5"
 	"io"
-	"log"
-	"math/rand"
 	"net/http"
-	"shortURL/internal/app"
 	"strings"
-	"sync"
-	"time"
 )
-
-var (
-	key string
-)
-
-func SetShortURL(fURL string, Params *app.Param) string {
-	key = HashStr(fURL)
-	_, true := app.BaseURL[key]
-	if true {
-		return key
-	}
-
-	var mutex sync.Mutex
-	mutex.Lock()
-	app.BaseURL[key] = fURL
-	if Params.SaveDB {
-		file, err := app.NewWriterDB(Params)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer file.Close()
-		file.WriteDB(key, fURL)
-	}
-	mutex.Unlock()
-	return key
-}
-
-func RetFullURL(key string) string {
-	return app.BaseURL[key]
-}
-
-func RandomStr() string {
-	const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	n := 6
-	bts := make([]byte, n)
-	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < n; i++ {
-		bts[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(bts)
-}
-
-func HashStr(s string) string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(s)))
-}
 
 type gzipWriter struct {
 	http.ResponseWriter

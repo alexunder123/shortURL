@@ -8,7 +8,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"shortURL/internal/app"
+	"shortURL/internal/config"
+	"shortURL/internal/storage"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,8 +17,9 @@ import (
 )
 
 func TestRouter(t *testing.T) {
-	Params := app.GetEnv()
-	r := NewRouter(Params)
+	Params := config.NewEnv()
+	storage := storage.NewStorager(Params)
+	r := NewRouter(Params, storage)
 
 	l, err := net.Listen("tcp", Params.Server)
 	if err != nil {
