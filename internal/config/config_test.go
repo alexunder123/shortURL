@@ -14,9 +14,10 @@ func TestGetEnv(t *testing.T) {
 		{
 			name: "test1",
 			want: &Param{
-				Server:  "127.0.0.1:8080",
-				URL:     "http://127.0.0.1:8080",
-				Storage: "jsonDB.json",
+				Server:   "127.0.0.1:8080",
+				URL:      "http://127.0.0.1:8080",
+				Storage:  "jsonDB.json",
+				SaveFile: 1,
 			},
 		},
 	}
