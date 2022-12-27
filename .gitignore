@@ -21,3 +21,8 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+/temp
+
+#Temporary files
+$TEMP_FILE
+*.json

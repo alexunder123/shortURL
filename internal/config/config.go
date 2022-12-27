@@ -1,0 +1,30 @@
+package config
+
+import (
+	"log"
+
+	"github.com/caarlos0/env/v6"
+)
+
+type Param struct {
+	Server   string `env:"SERVER_ADDRESS"`
+	URL      string `env:"BASE_URL"`
+	Storage  string `env:"FILE_STORAGE_PATH"`
+	SaveFile int
+}
+
+func NewEnv() *Param {
+	var Params Param
+
+	err := env.Parse(&Params)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ReadFlags(&Params)
+
+if Params.Storage != "" {
+	Params.SaveFile = 1
+}
+
+	return &Params
+}

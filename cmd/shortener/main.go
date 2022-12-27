@@ -3,12 +3,15 @@ package main
 import (
 	"log"
 	"net/http"
+	"shortURL/internal/config"
 	"shortURL/internal/handlers"
+	"shortURL/internal/storage"
 )
 
 func main() {
-	r := handlers.NewRouter()
+	params := config.NewEnv()
+	storage := storage.NewStorager(params)
+	r := handlers.NewRouter(params, storage)
 
-	// http.HandleFunc("/", handlers.ShortenerURL)
-	log.Fatal(http.ListenAndServe("localhost:8080", r))
+	log.Fatal(http.ListenAndServe(params.Server, r))
 }
