@@ -23,22 +23,13 @@ func Cookies(next http.Handler) http.Handler {
 		var nc bool = false
 		var ID string
 		var c http.Cookie
-		var err error
 		for _, cookie := range r.Cookies() {
 			if cookie.Name == "shortener" {
 				c = *cookie
 				break
 			}
 		}
-		if err != nil {
-			ID, err = NewCookie(&c)
-			if err != nil {
-				log.Println(err)
-			} else {
-				nc = true
-			}
-		} else {
-			err = CheckCookie(&c)
+			err := CheckCookie(&c)
 			if err != nil {
 				log.Println(err)
 				ID, err = NewCookie(&c)
@@ -54,7 +45,6 @@ func Cookies(next http.Handler) http.Handler {
 				}
 			}
 
-		}
 		if nc {
 			http.SetCookie(w, &c)
 		}
