@@ -26,3 +26,4 @@ vendor/
 #Temporary files
 $TEMP_FILE
 *.json
+*.txt

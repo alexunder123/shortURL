@@ -23,6 +23,7 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(Decompress)
+	r.Use(Cookies)
 
 	r.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
 		var Addr PostURL
@@ -40,7 +41,9 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 			return
 		}
-		key := S.SetShortURL(Addr.GetURL, P)
+		UserID := ReadContextID(r)
+
+		key := S.SetShortURL(Addr.GetURL, UserID, P)
 		NewAddr := PostURL{SetURL: P.URL + "/" + key}
 		NewAddrBZ, err := json.Marshal(NewAddr)
 		if err != nil {
@@ -53,6 +56,7 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
+		UserID := ReadContextID(r)
 		bytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -64,10 +68,26 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 			http.Error(w, "Wrong address!", http.StatusBadRequest)
 			return
 		}
-		key := S.SetShortURL(fURL, P)
+		key := S.SetShortURL(fURL, UserID, P)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(P.URL + "/" + key))
+	})
+
+	r.Get("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
+		UserID := ReadContextID(r)
+		URLsBZ, err := S.ReturnAllURLs(UserID, P)
+		if err == storage.ErrNoContent {
+			http.Error(w, err.Error(), http.StatusNoContent)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write(URLsBZ)
 	})
 
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -78,5 +98,6 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 		}
 		http.Redirect(w, r, address, http.StatusTemporaryRedirect)
 	})
+
 	return r
 }

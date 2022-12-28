@@ -42,3 +42,4 @@ func Decompress(next http.Handler) http.Handler {
 		}
 	})
 }
+

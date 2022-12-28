@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	params := config.NewEnv()
-	storage := storage.NewStorager(params)
+	params := config.NewConfig()
+	storage := storage.NewStorage(params)
 	r := handlers.NewRouter(params, storage)
 
 	log.Fatal(http.ListenAndServe(params.Server, r))

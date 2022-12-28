@@ -17,8 +17,8 @@ import (
 )
 
 func TestRouter(t *testing.T) {
-	Params := config.NewEnv()
-	storage := storage.NewStorager(Params)
+	Params := config.NewConfig()
+	storage := storage.NewStorage(Params)
 	r := NewRouter(Params, storage)
 
 	l, err := net.Listen("tcp", Params.Server)

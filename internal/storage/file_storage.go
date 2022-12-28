@@ -16,13 +16,14 @@ func NewFileStorager(P *config.Param) Storager {
 	ReadStorage(P)
 	return &FileStorage{
 		StorageStruct: StorageStruct{
-			Key:   "",
-			Value: "",
+			UserID: "",
+			Key:    "",
+			Value:  "",
 		},
 	}
 }
 
-func (s *FileStorage) SetShortURL(fURL string, Params *config.Param) string {
+func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) string {
 	s.Key = HashStr(fURL)
 	_, true := BaseURL[s.Key]
 	if true {
@@ -32,13 +33,14 @@ func (s *FileStorage) SetShortURL(fURL string, Params *config.Param) string {
 	var mutex sync.Mutex
 	mutex.Lock()
 	BaseURL[s.Key] = fURL
+	UserURL[s.Key] = UserID
+	mutex.Unlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-	file.WriteFile(s.Key, fURL)
-	mutex.Unlock()
+	file.WriteFile(s.Key, UserID, fURL)
 	return s.Key
 }
 
@@ -51,6 +53,28 @@ type readerFile struct {
 	decoder *json.Decoder
 }
 
+func (s *FileStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
+	if len(BaseURL) == 0 {
+		return nil, ErrNoContent
+	}
+	var AllURLs = make([]URLs, 0)
+	var mutex sync.Mutex
+	mutex.Lock()
+	for key, value := range BaseURL {
+		if UserURL[key] == UserID {
+			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
+		}
+	}
+	mutex.Unlock()
+	if len(AllURLs) == 0 {
+		return nil, ErrNoContent
+	}
+	sb, err := json.Marshal(AllURLs)
+	if err != nil {
+		return nil, err
+	}
+	return sb, nil
+}
 
 func ReadStorage(P *config.Param) {
 	file, err := NewReaderFile(P)
@@ -87,6 +111,7 @@ func (r *readerFile) ReadFile() {
 			return
 		}
 		BaseURL[t.Key] = t.Value
+		UserURL[t.Key] = t.UserID
 	}
 }
 
@@ -110,8 +135,8 @@ func NewWriterFile(P *config.Param) (*writerFile, error) {
 	}, nil
 }
 
-func (w *writerFile) WriteFile(key, value string) {
-	t := StorageStruct{Key: key, Value: value}
+func (w *writerFile) WriteFile(key, userID, value string) {
+	t := StorageStruct{UserID: userID, Key: key, Value: value}
 	err := w.encoder.Encode(&t)
 	if err != nil {
 		log.Println(err)

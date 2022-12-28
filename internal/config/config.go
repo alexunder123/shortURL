@@ -13,7 +13,7 @@ type Param struct {
 	SaveFile int
 }
 
-func NewEnv() *Param {
+func NewConfig() *Param {
 	var Params Param
 
 	err := env.Parse(&Params)
@@ -22,9 +22,9 @@ func NewEnv() *Param {
 	}
 	ReadFlags(&Params)
 
-if Params.Storage != "" {
-	Params.SaveFile = 1
-}
+	if Params.Storage != "" {
+		Params.SaveFile = 1
+	}
 
 	return &Params
 }
