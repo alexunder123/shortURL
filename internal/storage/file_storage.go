@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"shortURL/internal/config"
@@ -74,6 +75,10 @@ func (s *FileStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, err
 		return nil, err
 	}
 	return sb, nil
+}
+
+func (s *FileStorage) CheckPing(P *config.Param) error {
+	return errors.New("wrong DB used: file storage")
 }
 
 func ReadStorage(P *config.Param) {

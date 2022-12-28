@@ -99,5 +99,15 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 		http.Redirect(w, r, address, http.StatusTemporaryRedirect)
 	})
 
+	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		err := S.CheckPing(P)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+	})
+
 	return r
 }

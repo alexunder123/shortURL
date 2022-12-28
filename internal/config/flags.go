@@ -14,5 +14,8 @@ func ReadFlags(P *Param) {
 	if P.Storage == "" {
 		flag.StringVar(&P.Storage, "f", "", "Хранилище URL")
 	}
+	if P.SQL == "" {
+		flag.StringVar(&P.Storage, "d", "", "База данных SQL")
+	}
 	flag.Parse()
 }

@@ -18,12 +18,15 @@ type Storager interface {
 
 	RetFullURL(key string) string
 	ReturnAllURLs(UserID string, P *config.Param) ([]byte, error)
+	CheckPing(P *config.Param) error
 }
 
 func NewStorage(P *config.Param) Storager {
 	switch P.SaveFile {
 	case 1:
 		return NewFileStorager(P)
+	case 2:
+		return NewSQLStorager()
 	default:
 		return NewMemoryStorager()
 	}

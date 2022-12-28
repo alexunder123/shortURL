@@ -72,9 +72,12 @@ func CheckCookie(c *http.Cookie) error {
 	// if err != nil {
 	// 	return err
 	// }
-	
+
 	if c.Name != "shortener" {
 		return errors.New("invalid cookie name")
+	}
+	if c.Value == "" {
+		return errors.New("empty cookie value")
 	}
 	ID, err := ReturnID(c)
 	if err != nil {

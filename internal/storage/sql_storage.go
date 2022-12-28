@@ -1,18 +1,22 @@
 package storage
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
-	"errors"
 	"shortURL/internal/config"
 	"sync"
+	"time"
+
+	_ "github.com/jackc/pgx/v5"
 )
 
-type MemoryStorage struct {
+type SQLStorage struct {
 	StorageStruct
 }
 
-func NewMemoryStorager() Storager {
-	return &MemoryStorage{
+func NewSQLStorager() Storager {
+	return &SQLStorage{
 		StorageStruct: StorageStruct{
 			UserID: "",
 			Key:    "",
@@ -21,7 +25,7 @@ func NewMemoryStorager() Storager {
 	}
 }
 
-func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) string {
+func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) string {
 	s.Key = HashStr(fURL)
 	_, true := BaseURL[s.Key]
 	if true {
@@ -36,11 +40,11 @@ func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) s
 	return s.Key
 }
 
-func (s *MemoryStorage) RetFullURL(key string) string {
+func (s *SQLStorage) RetFullURL(key string) string {
 	return BaseURL[key]
 }
 
-func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
+func (s *SQLStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
 	if len(BaseURL) == 0 {
 		return nil, ErrNoContent
 	}
@@ -63,6 +67,15 @@ func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, e
 	return sb, nil
 }
 
-func (s *MemoryStorage) CheckPing(P *config.Param) error {
-	return errors.New("wrong DB used: memory storage")
+func (s *SQLStorage) CheckPing(P *config.Param) error {
+	db, err := sql.Open("PostgreSQL", P.SQL)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	var ctx context.Context
+	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+	err = db.PingContext(ctx)
+	return err
 }
