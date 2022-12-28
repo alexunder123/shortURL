@@ -20,7 +20,6 @@ type nameID string
 
 func Cookies(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var nc bool = false
 		var ID string
 		var c http.Cookie
 		for _, cookie := range r.Cookies() {
@@ -36,7 +35,7 @@ func Cookies(next http.Handler) http.Handler {
 				if err != nil {
 					log.Println(err)
 				} else {
-					nc = true
+					http.SetCookie(w, &c)
 				}
 			} else {
 				ID, err = ReturnID(&c)
@@ -44,10 +43,6 @@ func Cookies(next http.Handler) http.Handler {
 					log.Println(err)
 				}
 			}
-
-		if nc {
-			http.SetCookie(w, &c)
-		}
 		ctx := context.WithValue(r.Context(), name, ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -66,7 +61,7 @@ func NewCookie(c *http.Cookie) (string, error) {
 
 	c.Name = "shortener"
 	c.Value = hex.EncodeToString(dst)
-	c.Path = "/"
+	// c.Path = "/"
 	c.MaxAge = 300
 	SaveID(string(ID))
 	return string(ID), nil
