@@ -28,21 +28,21 @@ func Cookies(next http.Handler) http.Handler {
 				break
 			}
 		}
-			err := CheckCookie(&c)
+		err := CheckCookie(&c)
+		if err != nil {
+			log.Println(err)
+			ID, err = NewCookie(&c)
 			if err != nil {
 				log.Println(err)
-				ID, err = NewCookie(&c)
-				if err != nil {
-					log.Println(err)
-				} else {
-					http.SetCookie(w, &c)
-				}
 			} else {
-				ID, err = ReturnID(&c)
-				if err != nil {
-					log.Println(err)
-				}
+				http.SetCookie(w, &c)
 			}
+		} else {
+			ID, err = ReturnID(&c)
+			if err != nil {
+				log.Println(err)
+			}
+		}
 		ctx := context.WithValue(r.Context(), name, ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -58,19 +58,23 @@ func NewCookie(c *http.Cookie) (string, error) {
 
 	dst := make([]byte, aes.BlockSize)
 	aesblock.Encrypt(dst, ID)
-
 	c.Name = "shortener"
 	c.Value = hex.EncodeToString(dst)
-	// c.Path = "/"
-	c.MaxAge = 300
+	c.Path = "/"
+	c.Expires = time.Now().Add(time.Hour)
 	SaveID(string(ID))
 	return string(ID), nil
 }
 
 func CheckCookie(c *http.Cookie) error {
-	err := c.Valid()
-	if err != nil {
-		return err
+	//При проверке встроенной функцией выдает ошибку "invalid Cookie.Expires" в тесте fetch_urls
+	// err := c.Valid()
+	// if err != nil {
+	// 	return err
+	// }
+	
+	if c.Name != "shortener" {
+		return errors.New("invalid cookie name")
 	}
 	ID, err := ReturnID(c)
 	if err != nil {
@@ -91,7 +95,6 @@ func ReturnID(c *http.Cookie) (string, error) {
 	if err != nil {
 		return "", errors.New("cannot decode cookie")
 	}
-	log.Println(val)
 	aesblock.Decrypt(ID, val)
 	return string(ID), nil
 }
