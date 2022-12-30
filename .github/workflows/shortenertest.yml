@@ -358,7 +358,7 @@ jobs:
           github.head_ref == 'iter24'
         run: |
           shortenertest -test.v -test.run=^TestIteration11$ \
-              -binary-path=cmd/shortener/shortener \
+              -binary-path=cmd/shortener/main \
               -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable'
 
       - name: "Code increment #12"

@@ -26,7 +26,7 @@ func NewStorage(P *config.Param) Storager {
 	case 1:
 		return NewFileStorager(P)
 	case 2:
-		return NewSQLStorager()
+		return NewSQLStorager(P)
 	default:
 		return NewMemoryStorager()
 	}

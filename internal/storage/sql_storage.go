@@ -8,15 +8,18 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type SQLStorage struct {
+	db *sql.DB
 	StorageStruct
 }
 
-func NewSQLStorager() Storager {
+func NewSQLStorager(P *config.Param) Storager {
+	DB := OpenDB(P)
 	return &SQLStorage{
+		db: DB,
 		StorageStruct: StorageStruct{
 			UserID: "",
 			Key:    "",
@@ -68,14 +71,26 @@ func (s *SQLStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, erro
 }
 
 func (s *SQLStorage) CheckPing(P *config.Param) error {
-	db, err := sql.Open("PostgreSQL", P.SQL)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
+	// db, err := sql.Open("pgx", P.SQL)
+	// db, err := pgx.Connect(context.Background(), P.SQL)
+	// if err != nil {
+	// 	return err
+	// }
+	// defer db.Close()
+	// defer db.Close(context.Background())
 	var ctx context.Context
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
-	err = db.PingContext(ctx)
+	err := s.db.PingContext(ctx)
+	// err = db.Ping(ctx)
 	return err
+}
+
+func OpenDB(P *config.Param) *sql.DB {
+	db, err := sql.Open("pgx", P.SQL)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+	return db
 }
