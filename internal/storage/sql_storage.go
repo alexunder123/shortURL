@@ -1,25 +1,24 @@
 package storage
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"shortURL/internal/config"
 	"sync"
-	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	// _ "github.com/mattn/go-sqlite3"
 )
 
 type SQLStorage struct {
-	db *sql.DB
+	DB *sql.DB
 	StorageStruct
 }
 
 func NewSQLStorager(P *config.Param) Storager {
 	DB := OpenDB(P)
 	return &SQLStorage{
-		db: DB,
+		DB: DB,
 		StorageStruct: StorageStruct{
 			UserID: "",
 			Key:    "",
@@ -78,16 +77,18 @@ func (s *SQLStorage) CheckPing(P *config.Param) error {
 	// }
 	// defer db.Close()
 	// defer db.Close(context.Background())
-	var ctx context.Context
-	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	defer cancel()
-	err := s.db.PingContext(ctx)
+	// var ctx context.Context
+	// ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
+	// defer cancel()
+	// err := s.db.PingContext(ctx)
+	err := s.DB.Ping()
 	// err = db.Ping(ctx)
 	return err
 }
 
 func OpenDB(P *config.Param) *sql.DB {
 	db, err := sql.Open("pgx", P.SQL)
+	// db, err := sql.Open("sqlite3", "P.SQL")
 	if err != nil {
 		panic(err)
 	}

@@ -22,13 +22,10 @@ func NewConfig() *Param {
 		log.Fatal(err)
 	}
 	ReadFlags(&Params)
-
-	if Params.Storage != "" {
-		Params.SaveFile = 1
-	}
-	//В случае, если переданы и файловое и SQL хранилища. Приоритет будет у SQL
 	if Params.SQL != "" {
 		Params.SaveFile = 2
+	}else if Params.Storage != "" {
+		Params.SaveFile = 1
 	}
 
 	return &Params
