@@ -16,8 +16,9 @@ type SQLStorage struct {
 
 func NewSQLStorager(P *config.Param) Storager {
 	DBs := OpenDB(P)
+	defer DBs.Close()
 	return &SQLStorage{
-		DB: DBs,
+		DB: *DBs,
 		StorageStruct: StorageStruct{
 			UserID: "",
 			Key:    "",
@@ -32,6 +33,9 @@ func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) stri
 	var isexist string
 	row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE key = $1", s.Key)
 	if err != nil {
+		log.Fatal(err)
+	}
+	if err := row.Err(); err != nil {
 		log.Fatal(err)
 	}
 	defer row.Close()
@@ -57,6 +61,9 @@ func (s *SQLStorage) RetFullURL(key string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if err := row.Err(); err != nil {
+		log.Fatal(err)
+	}
 	defer row.Close()
 	for row.Next() {
 		err = row.Scan(&value)
@@ -72,6 +79,9 @@ func (s *SQLStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, erro
 	var AllURLs = make([]URLs, 0)
 	rows, err := s.DB.Query("SELECT key, value FROM GO12Alex WHERE user_id = $1", UserID)
 	if err != nil {
+		log.Fatal(err)
+	}
+	if err := rows.Err(); err != nil {
 		log.Fatal(err)
 	}
 	defer rows.Close()
@@ -101,15 +111,13 @@ func (s *SQLStorage) CheckPing(P *config.Param) error {
 	return err
 }
 
-func OpenDB(P *config.Param) sql.DB {
+func OpenDB(P *config.Param) *sql.DB {
 	db, err := sql.Open("pgx", P.SQL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
 	CreateDB(db)
-
-	return *db
+	return db
 }
 
 func CreateDB(db *sql.DB) {
