@@ -3,22 +3,21 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"shortURL/internal/config"
-	"sync"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	// _ "github.com/mattn/go-sqlite3"
 )
 
 type SQLStorage struct {
-	DB *sql.DB
+	DB sql.DB
 	StorageStruct
 }
 
 func NewSQLStorager(P *config.Param) Storager {
-	DB := OpenDB(P)
+	DBs := OpenDB(P)
 	return &SQLStorage{
-		DB: DB,
+		DB: DBs,
 		StorageStruct: StorageStruct{
 			UserID: "",
 			Key:    "",
@@ -29,36 +28,64 @@ func NewSQLStorager(P *config.Param) Storager {
 
 func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) string {
 	s.Key = HashStr(fURL)
-	_, true := BaseURL[s.Key]
-	if true {
-		return s.Key
-	}
 
-	var mutex sync.RWMutex
-	mutex.Lock()
-	BaseURL[s.Key] = fURL
-	UserURL[s.Key] = UserID
-	mutex.Unlock()
+	var isexist string
+	row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE key = $1", s.Key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer row.Close()
+	for row.Next() {
+		err = row.Scan(&isexist)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if isexist != "" {
+			return s.Key
+		}
+	}
+	_, err = s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3)", s.Key, UserID, fURL)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return s.Key
 }
 
 func (s *SQLStorage) RetFullURL(key string) string {
-	return BaseURL[key]
+	var value string
+	row, err := s.DB.Query("SELECT value FROM GO12Alex WHERE key = $1", key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer row.Close()
+	for row.Next() {
+		err = row.Scan(&value)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	return value
 }
 
 func (s *SQLStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
-	if len(BaseURL) == 0 {
-		return nil, ErrNoContent
-	}
+
 	var AllURLs = make([]URLs, 0)
-	var mutex sync.Mutex
-	mutex.Lock()
-	for key, value := range BaseURL {
-		if UserURL[key] == UserID {
-			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
-		}
+	rows, err := s.DB.Query("SELECT key, value FROM GO12Alex WHERE user_id = $1", UserID)
+	if err != nil {
+		log.Fatal(err)
 	}
-	mutex.Unlock()
+	defer rows.Close()
+	for rows.Next() {
+		var nextURL URLs
+		var sURL string
+
+		err = rows.Scan(&sURL, &nextURL.OriginalURL)
+		if err != nil {
+			panic(err)
+		}
+		nextURL.ShortURL = string(P.URL + "/" + sURL)
+		AllURLs = append(AllURLs, nextURL)
+	}
 	if len(AllURLs) == 0 {
 		return nil, ErrNoContent
 	}
@@ -70,28 +97,24 @@ func (s *SQLStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, erro
 }
 
 func (s *SQLStorage) CheckPing(P *config.Param) error {
-	// db, err := sql.Open("pgx", P.SQL)
-	// db, err := pgx.Connect(context.Background(), P.SQL)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer db.Close()
-	// defer db.Close(context.Background())
-	// var ctx context.Context
-	// ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
-	// defer cancel()
-	// err := s.db.PingContext(ctx)
 	err := s.DB.Ping()
-	// err = db.Ping(ctx)
 	return err
 }
 
-func OpenDB(P *config.Param) *sql.DB {
+func OpenDB(P *config.Param) sql.DB {
 	db, err := sql.Open("pgx", P.SQL)
-	// db, err := sql.Open("sqlite3", "P.SQL")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	defer db.Close()
-	return db
+	CreateDB(db)
+
+	return *db
+}
+
+func CreateDB(db *sql.DB) {
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS " + `GO12Alex("key" text, "user_id" text, "value" text);`)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
