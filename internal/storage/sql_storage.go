@@ -10,7 +10,7 @@ import (
 )
 
 type SQLStorage struct {
-	DB sql.DB
+	DB *sql.DB
 	StorageStruct
 }
 
@@ -18,7 +18,7 @@ func NewSQLStorager(P *config.Param) Storager {
 	DBs := OpenDB(P)
 	defer DBs.Close()
 	return &SQLStorage{
-		DB: *DBs,
+		DB: DBs,
 		StorageStruct: StorageStruct{
 			UserID: "",
 			Key:    "",
