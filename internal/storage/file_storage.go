@@ -81,6 +81,27 @@ func (s *FileStorage) CheckPing(P *config.Param) error {
 	return errors.New("wrong DB used: file storage")
 }
 
+func (s *FileStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param) (*[]MultiURL, error) {
+	r := make([]MultiURL, len(*m))
+	file, err := NewWriterFile(P)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	for _, v := range *m {
+		Key := HashStr(v.OriginURL)
+		var mutex sync.RWMutex
+		mutex.Lock()
+		BaseURL[Key] = v.OriginURL
+		UserURL[Key] = UserID
+		mutex.Unlock()
+		file.WriteFile(s.Key, UserID, v.OriginURL)
+		r = append(r, MultiURL{CorrID: v.CorrID, ShortURL: string(P.URL + "/" + Key)})
+	}
+
+	return &r, nil
+}
+
 func ReadStorage(P *config.Param) {
 	file, err := NewReaderFile(P)
 	if err != nil {

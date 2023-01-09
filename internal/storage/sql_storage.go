@@ -14,6 +14,8 @@ type SQLStorage struct {
 	StorageStruct
 }
 
+var ()
+
 func NewSQLStorager(P *config.Param) Storager {
 	DBs := OpenDB(P)
 	defer DBs.Close()
@@ -109,6 +111,34 @@ func (s *SQLStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, erro
 func (s *SQLStorage) CheckPing(P *config.Param) error {
 	err := s.DB.Ping()
 	return err
+}
+
+func (s *SQLStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param) (*[]MultiURL, error) {
+	r := make([]MultiURL, len(*m))
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	stmt, err := tx.Prepare("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3)")
+	if err != nil {
+		return nil, err
+	}
+	defer stmt.Close()
+	for _, v := range *m {
+		Key := HashStr(v.OriginURL)
+		if _, err = stmt.Exec(Key, UserID, v.OriginURL); err != nil {
+			if err = tx.Rollback(); err != nil {
+				log.Fatalf("update drivers: unable to rollback: %v", err)
+			}
+			return nil, err
+		}
+		r = append(r, MultiURL{CorrID: v.CorrID, ShortURL: string(P.URL + "/" + Key)})
+	}
+	if err := tx.Commit(); err != nil {
+		log.Fatalf("update drivers: unable to commit: %v", err)
+		return nil, err
+	}
+	return &r, nil
 }
 
 func OpenDB(P *config.Param) *sql.DB {

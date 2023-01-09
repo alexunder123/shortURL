@@ -66,3 +66,18 @@ func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, e
 func (s *MemoryStorage) CheckPing(P *config.Param) error {
 	return errors.New("wrong DB used: memory storage")
 }
+
+func (s *MemoryStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param) (*[]MultiURL, error) {
+	r := make([]MultiURL, len(*m))
+	for _, v := range *m {
+		Key := HashStr(v.OriginURL)
+		var mutex sync.RWMutex
+		mutex.Lock()
+		BaseURL[Key] = v.OriginURL
+		UserURL[Key] = UserID
+		mutex.Unlock()
+		r = append(r, MultiURL{CorrID: v.CorrID, ShortURL: string(P.URL + "/" + Key)})
+	}
+
+	return &r, nil
+}

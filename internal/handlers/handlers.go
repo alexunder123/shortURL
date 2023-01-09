@@ -17,6 +17,7 @@ type PostURL struct {
 	SetURL string `json:"result,omitempty"`
 }
 
+
 func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 	r := chi.NewRouter()
 
@@ -25,6 +26,33 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 	r.Use(Decompress)
 	r.Use(Cookies)
 
+	r.Post("/api/shorten/batch", func(w http.ResponseWriter, r *http.Request){
+		var MultiURLs = make([]storage.MultiURL, 0)
+		bytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err = json.Unmarshal(bytes, &MultiURLs); err != nil {
+			http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
+			return
+		}
+		UserID := ReadContextID(r)
+		RMultiURLs, err := S.WriteMultiURL(&MultiURLs, UserID, P)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		RMultiURLsBZ, err := json.Marshal(RMultiURLs)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusCreated)
+		w.Write(RMultiURLsBZ)
+	})
+	
 	r.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
 		var Addr PostURL
 		bytes, err := io.ReadAll(r.Body)

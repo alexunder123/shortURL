@@ -15,7 +15,7 @@ var (
 
 type Storager interface {
 	SetShortURL(fURL, UserID string, Params *config.Param) string
-
+	WriteMultiURL (m *[]MultiURL, UserID string, P *config.Param)  (*[]MultiURL, error)
 	RetFullURL(key string) string
 	ReturnAllURLs(UserID string, P *config.Param) ([]byte, error)
 	CheckPing(P *config.Param) error
@@ -45,4 +45,10 @@ func HashStr(s string) string {
 type URLs struct {
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
+}
+
+type MultiURL struct {
+	CorrID string `json:"correlation_id"`
+	OriginURL string `json:"original_url,omitempty"`
+	ShortURL string `json:"short_url,omitempty"`
 }
