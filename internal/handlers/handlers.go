@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"shortURL/internal/config"
@@ -130,6 +131,7 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		err := S.CheckPing(P)
 		if err != nil {
+			log.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
