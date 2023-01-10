@@ -24,11 +24,11 @@ func NewFileStorager(P *config.Param) Storager {
 	}
 }
 
-func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) string {
+func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param)  (string, error) {
 	s.Key = HashStr(fURL)
 	_, true := BaseURL[s.Key]
 	if true {
-		return s.Key
+		return s.Key, ErrConflict
 	}
 
 	var mutex sync.Mutex
@@ -42,7 +42,7 @@ func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) str
 	}
 	defer file.Close()
 	file.WriteFile(s.Key, UserID, fURL)
-	return s.Key
+	return s.Key, nil
 }
 
 func (s *FileStorage) RetFullURL(key string) string {

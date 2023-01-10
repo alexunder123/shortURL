@@ -21,11 +21,11 @@ func NewMemoryStorager() Storager {
 	}
 }
 
-func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) string {
+func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
 	s.Key = HashStr(fURL)
 	_, true := BaseURL[s.Key]
 	if true {
-		return s.Key
+		return s.Key, ErrConflict
 	}
 
 	var mutex sync.RWMutex
@@ -33,7 +33,7 @@ func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) s
 	BaseURL[s.Key] = fURL
 	UserURL[s.Key] = UserID
 	mutex.Unlock()
-	return s.Key
+	return s.Key, nil
 }
 
 func (s *MemoryStorage) RetFullURL(key string) string {

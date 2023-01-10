@@ -11,10 +11,11 @@ var (
 	BaseURL            = make(map[string]string)
 	UserURL            = make(map[string]string)
 	ErrNoContent error = errors.New("StatusNoContent")
+	ErrConflict error = errors.New("StatusConflict")
 )
 
 type Storager interface {
-	SetShortURL(fURL, UserID string, Params *config.Param) string
+	SetShortURL(fURL, UserID string, Params *config.Param)  (string, error)
 	WriteMultiURL (m *[]MultiURL, UserID string, P *config.Param)  (*[]MultiURL, error)
 	RetFullURL(key string) string
 	ReturnAllURLs(UserID string, P *config.Param) ([]byte, error)

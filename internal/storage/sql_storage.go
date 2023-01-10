@@ -29,11 +29,17 @@ func NewSQLStorager(P *config.Param) Storager {
 	}
 }
 
-func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) string {
+func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param)  (string, error) {
 	s.Key = HashStr(fURL)
 
-	var isexist string
-	row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE key = $1", s.Key)
+	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT (value) DO NOTHING", s.Key, UserID, fURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+	changes, _ := result.RowsAffected()
+	if changes == 0 {
+		var oldkey string
+	row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE value = $1", fURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,19 +48,16 @@ func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) stri
 	}
 	defer row.Close()
 	for row.Next() {
-		err = row.Scan(&isexist)
+		err = row.Scan(&oldkey)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if isexist != "" {
-			return s.Key
+		if oldkey != "" {
+			return oldkey, ErrConflict
 		}
 	}
-	_, err = s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3)", s.Key, UserID, fURL)
-	if err != nil {
-		log.Fatal(err)
 	}
-	return s.Key
+	return s.Key, nil
 }
 
 func (s *SQLStorage) RetFullURL(key string) string {
