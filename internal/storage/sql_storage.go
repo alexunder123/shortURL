@@ -18,7 +18,7 @@ var ()
 
 func NewSQLStorager(P *config.Param) Storager {
 	DBs := OpenDB(P)
-	defer DBs.Close()
+	// defer DBs.Close()
 	return &SQLStorage{
 		DB: DBs,
 		StorageStruct: StorageStruct{

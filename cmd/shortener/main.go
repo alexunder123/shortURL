@@ -18,6 +18,6 @@ func main() {
 	r := handlers.NewRouter(params, storage)
 	log.Println("Server initialized")
 	duration := time.Since(t1)
-	log.Printf("Время инициализации %d\n", duration.Milliseconds())
+	log.Printf("Время инициализации %d мс \n", duration.Milliseconds())
 	log.Fatal(http.ListenAndServe(params.Server, r))
 }
