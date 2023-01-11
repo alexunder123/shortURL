@@ -10,8 +10,9 @@ import (
 
 func main() {
 	params := config.NewConfig()
-	storage := storage.NewStorage(params)
-	r := handlers.NewRouter(params, storage)
-
+	store := storage.NewStorage(params)
+	log.Println("storage init")
+	r := handlers.NewRouter(params, store)
+	log.Println("handler init")
 	log.Fatal(http.ListenAndServe(params.Server, r))
 }

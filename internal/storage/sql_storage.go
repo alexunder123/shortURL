@@ -18,7 +18,10 @@ var ()
 
 func NewSQLStorager(P *config.Param) Storager {
 	DBs := OpenDB(P)
-	defer DBs.Close()
+	defer func() {
+		log.Println("defer ")
+		DBs.Close()
+	} ()
 	return &SQLStorage{
 		DB: DBs,
 		StorageStruct: StorageStruct{
@@ -39,7 +42,7 @@ func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param)  (st
 	changes, _ := result.RowsAffected()
 	if changes == 0 {
 		var oldkey string
-	row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE value = $1", fURL)
+	row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE user_id, value = $1, $2", UserID, fURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,5 +160,13 @@ func CreateDB(db *sql.DB) {
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS " + `GO12Alex("key" text, "user_id" text, "value" text);`)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func (s *SQLStorage) CloseDB() {
+	log.Println("defer db closing")
+	err := s.DB.Close()
+	if err != nil {
+		log.Println(err)
 	}
 }
