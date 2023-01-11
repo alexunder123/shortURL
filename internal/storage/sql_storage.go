@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"os"
 	"shortURL/internal/config"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -30,7 +31,7 @@ func NewSQLStorager(P *config.Param) Storager {
 	}
 }
 
-func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param)  (string, error) {
+func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
 	s.Key = HashStr(fURL)
 
 	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT (user_id, value) DO NOTHING", s.Key, UserID, fURL)
@@ -40,23 +41,23 @@ func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param)  (st
 	changes, _ := result.RowsAffected()
 	if changes == 0 {
 		var oldkey string
-	row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE user_id, value = $1, $2", UserID, fURL)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := row.Err(); err != nil {
-		log.Fatal(err)
-	}
-	defer row.Close()
-	for row.Next() {
-		err = row.Scan(&oldkey)
+		row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE user_id, value = $1, $2", UserID, fURL)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if oldkey != "" {
-			return oldkey, ErrConflict
+		if err := row.Err(); err != nil {
+			log.Fatal(err)
 		}
-	}
+		defer row.Close()
+		for row.Next() {
+			err = row.Scan(&oldkey)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if oldkey != "" {
+				return oldkey, ErrConflict
+			}
+		}
 	}
 	return s.Key, nil
 }
@@ -162,9 +163,10 @@ func CreateDB(db *sql.DB) {
 }
 
 func CloseDB() {
-	log.Println("defer db closing")
+	log.Println("db closing")
 	err := DBs.Close()
 	if err != nil {
 		log.Println(err)
 	}
+	os.Exit(0)
 }
