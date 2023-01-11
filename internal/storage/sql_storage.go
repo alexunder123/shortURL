@@ -14,14 +14,12 @@ type SQLStorage struct {
 	StorageStruct
 }
 
-var ()
+var (
+	DBs *sql.DB
+)
 
 func NewSQLStorager(P *config.Param) Storager {
-	DBs := OpenDB(P)
-	defer func() {
-		log.Println("defer ")
-		DBs.Close()
-	} ()
+	DBs = OpenDB(P)
 	return &SQLStorage{
 		DB: DBs,
 		StorageStruct: StorageStruct{
@@ -163,9 +161,9 @@ func CreateDB(db *sql.DB) {
 	}
 }
 
-func (s *SQLStorage) CloseDB() {
+func CloseDB() {
 	log.Println("defer db closing")
-	err := s.DB.Close()
+	err := DBs.Close()
 	if err != nil {
 		log.Println(err)
 	}
