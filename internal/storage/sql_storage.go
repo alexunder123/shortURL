@@ -32,7 +32,7 @@ func NewSQLStorager(P *config.Param) Storager {
 func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param)  (string, error) {
 	s.Key = HashStr(fURL)
 
-	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT (value) DO NOTHING", s.Key, UserID, fURL)
+	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT (user_id, value) DO NOTHING", s.Key, UserID, fURL)
 	if err != nil {
 		log.Fatal(err)
 	}

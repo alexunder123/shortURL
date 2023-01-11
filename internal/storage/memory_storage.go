@@ -25,7 +25,9 @@ func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) (
 	s.Key = HashStr(fURL)
 	_, true := BaseURL[s.Key]
 	if true {
-		return s.Key, ErrConflict
+		if UserURL[s.Key] == UserID {
+			return s.Key, ErrConflict
+		}
 	}
 
 	var mutex sync.RWMutex
