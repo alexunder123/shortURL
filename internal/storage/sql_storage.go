@@ -34,14 +34,14 @@ func NewSQLStorager(P *config.Param) Storager {
 func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
 	s.Key = HashStr(fURL)
 
-	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT (user_id, value) DO NOTHING", s.Key, UserID, fURL)
+	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", s.Key, UserID, fURL)
 	if err != nil {
 		log.Fatal(err)
 	}
 	changes, _ := result.RowsAffected()
 	if changes == 0 {
 		var oldkey string
-		row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE user_id, value = $1, $2", UserID, fURL)
+		row, err := s.DB.Query("SELECT key FROM GO12Alex WHERE user_id = $1 AND value = $2", UserID, fURL)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -156,7 +156,11 @@ func OpenDB(P *config.Param) *sql.DB {
 }
 
 func CreateDB(db *sql.DB) {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS " + `GO12Alex("key" text, "user_id" text, "value" text);`)
+	_, err := db.Exec("DROP TABLE IF EXISTS GO12Alex;")
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
 		log.Fatal(err)
 	}
