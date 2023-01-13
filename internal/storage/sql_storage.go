@@ -167,10 +167,10 @@ func CreateDB(db *sql.DB) {
 }
 
 func CloseDB() {
-	log.Println("db closing")
 	err := DBs.Close()
 	if err != nil {
 		log.Println(err)
 	}
+	log.Println("db closed")
 	os.Exit(0)
 }
