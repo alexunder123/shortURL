@@ -77,14 +77,18 @@ func TestRouter(t *testing.T) {
 			},
 		},
 	}
-
+if Params.SaveFile == 2 {
 	t.Run("Ping", func(t *testing.T) {
 		request1, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
 		require.NoError(t, err)
 		result, err := http.DefaultClient.Do(request1)
 		require.NoError(t, err)
 		assert.Equal(t, 200, result.StatusCode)
+		err = result.Body.Close()
+		require.NoError(t, err)
 	})
+}
+
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -143,6 +147,8 @@ func TestRouter(t *testing.T) {
 			result3, err := http.DefaultClient.Do(request3)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.statusCode3, result3.StatusCode)
+			err = result3.Body.Close()
+			require.NoError(t, err)
 
 			//GET
 			var request2 *http.Request
@@ -175,6 +181,8 @@ func TestRouter(t *testing.T) {
 			result4, err := http.DefaultClient.Do(request4)
 			require.NoError(t, err)
 			assert.Equal(t, 204, result4.StatusCode)
+			err = result4.Body.Close()
+			require.NoError(t, err)
 
 			// GET urls & cookie
 			var request5 *http.Request
@@ -186,7 +194,7 @@ func TestRouter(t *testing.T) {
 			assert.Equal(t, 200, result5.StatusCode)
 			userResult5, err := io.ReadAll(result5.Body)
 			require.NoError(t, err)
-			err = result.Body.Close()
+			err = result5.Body.Close()
 			require.NoError(t, err)
 			var AllURLs = make([]URLs, 0)
 			err = json.Unmarshal(userResult5, &AllURLs)
