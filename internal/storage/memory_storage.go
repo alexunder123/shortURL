@@ -71,14 +71,15 @@ func (s *MemoryStorage) CheckPing(P *config.Param) error {
 
 func (s *MemoryStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param) (*[]MultiURL, error) {
 	r := make([]MultiURL, len(*m))
-	for _, v := range *m {
+	for i, v := range *m {
 		Key := HashStr(v.OriginURL)
 		var mutex sync.RWMutex
 		mutex.Lock()
 		BaseURL[Key] = v.OriginURL
 		UserURL[Key] = UserID
 		mutex.Unlock()
-		r = append(r, MultiURL{CorrID: v.CorrID, ShortURL: string(P.URL + "/" + Key)})
+		r[i].CorrID = v.CorrID
+		r[i].ShortURL = string(P.URL + "/" + Key)
 	}
 
 	return &r, nil

@@ -77,18 +77,17 @@ func TestRouter(t *testing.T) {
 			},
 		},
 	}
-if Params.SaveFile == 2 {
-	t.Run("Ping", func(t *testing.T) {
-		request1, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
-		require.NoError(t, err)
-		result, err := http.DefaultClient.Do(request1)
-		require.NoError(t, err)
-		assert.Equal(t, 200, result.StatusCode)
-		err = result.Body.Close()
-		require.NoError(t, err)
-	})
-}
-
+	if Params.SaveFile == 2 {
+		t.Run("Ping", func(t *testing.T) {
+			request1, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
+			require.NoError(t, err)
+			result, err := http.DefaultClient.Do(request1)
+			require.NoError(t, err)
+			assert.Equal(t, 200, result.StatusCode)
+			err = result.Body.Close()
+			require.NoError(t, err)
+		})
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -206,20 +205,14 @@ if Params.SaveFile == 2 {
 	}
 
 	t.Run("MultiURL", func(t *testing.T) {
-		Multi := []struct {
-			mult MultiURL
-		}{
+		Multi := []MultiURL{
 			{
-				mult: MultiURL{
-					CorrID:    "abc123",
-					OriginURL: "/github.com/Yandex-Practicum/go-autotests",
-				},
+				CorrID:    "abc123",
+				OriginURL: "/github.com/Yandex-Practicum/go-autotests",
 			},
 			{
-				mult: MultiURL{
-					CorrID:    "def456",
-					OriginURL: "/postgrespro.ru/docs/postgrespro/13/sql-syntax",
-				},
+				CorrID:    "def456",
+				OriginURL: "/postgrespro.ru/docs/postgrespro/13/sql-syntax",
 			},
 		}
 		RMultiURLsBZ, err := json.Marshal(Multi)

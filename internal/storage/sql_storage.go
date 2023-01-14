@@ -129,7 +129,7 @@ func (s *SQLStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param
 		return nil, err
 	}
 	defer stmt.Close()
-	for _, v := range *m {
+	for i, v := range *m {
 		Key := HashStr(v.OriginURL)
 		if _, err = stmt.Exec(Key, UserID, v.OriginURL); err != nil {
 			if err = tx.Rollback(); err != nil {
@@ -137,7 +137,8 @@ func (s *SQLStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param
 			}
 			return nil, err
 		}
-		r = append(r, MultiURL{CorrID: v.CorrID, ShortURL: string(P.URL + "/" + Key)})
+		r[i].CorrID = v.CorrID
+		r[i].ShortURL = string(P.URL + "/" + Key)
 	}
 	if err := tx.Commit(); err != nil {
 		log.Fatalf("update drivers: unable to commit: %v", err)

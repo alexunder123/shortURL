@@ -90,7 +90,7 @@ func (s *FileStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Para
 		log.Fatal(err)
 	}
 	defer file.Close()
-	for _, v := range *m {
+	for i, v := range *m {
 		Key := HashStr(v.OriginURL)
 		var mutex sync.RWMutex
 		mutex.Lock()
@@ -98,7 +98,8 @@ func (s *FileStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Para
 		UserURL[Key] = UserID
 		mutex.Unlock()
 		file.WriteFile(s.Key, UserID, v.OriginURL)
-		r = append(r, MultiURL{CorrID: v.CorrID, ShortURL: string(P.URL + "/" + Key)})
+		r[i].CorrID = v.CorrID
+		r[i].ShortURL = string(P.URL + "/" + Key)
 	}
 
 	return &r, nil
