@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	log.Println("Start program")
 	params := config.NewConfig()
 	store := storage.NewStorage(params)
 	log.Println("storage init")

@@ -78,9 +78,16 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 
 		key, err := S.SetShortURL(Addr.GetURL, UserID, P)
 		if err == storage.ErrConflict {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			NewAddr := PostURL{SetURL: P.URL + "/" + key}
+			NewAddrBZ, err := json.Marshal(NewAddr)
+			if err != nil {
+				log.Println(err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
 			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(P.URL + "/" + key))
+			w.Write(NewAddrBZ)
 			return
 		}
 		NewAddr := PostURL{SetURL: P.URL + "/" + key}
