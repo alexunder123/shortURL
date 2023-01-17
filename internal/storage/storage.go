@@ -24,6 +24,7 @@ type Storager interface {
 	RetFullURL(key string) string
 	ReturnAllURLs(UserID string, P *config.Param) ([]byte, error)
 	CheckPing(P *config.Param) error
+	CloseDB()
 }
 
 func NewStorage(P *config.Param) Storager {
@@ -58,7 +59,7 @@ type MultiURL struct {
 	ShortURL  string `json:"short_url,omitempty"`
 }
 
-func CloserDB(P *config.Param) {
+func CloserDB(P *config.Param, S Storager) {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
@@ -67,7 +68,7 @@ func CloserDB(P *config.Param) {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
 				log.Println("Начинаем выход из программы")
 				if P.SaveFile == 2 {
-					CloseDB()
+					S.CloseDB()
 				} else {
 					os.Exit(0)
 				}

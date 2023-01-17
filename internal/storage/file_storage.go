@@ -175,3 +175,8 @@ func (w *writerFile) WriteFile(key, userID, value string) {
 func (w *writerFile) Close() error {
 	return w.file.Close()
 }
+
+func (s *FileStorage) CloseDB() {
+	log.Println("file closed")
+	os.Exit(0)
+}

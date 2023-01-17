@@ -15,6 +15,6 @@ func main() {
 	log.Println("storage init")
 	r := handlers.NewRouter(params, store)
 	log.Println("handler init")
-	storage.CloserDB(params)
+	storage.CloserDB(params, store)
 	log.Fatal(http.ListenAndServe(params.Server, r))
 }

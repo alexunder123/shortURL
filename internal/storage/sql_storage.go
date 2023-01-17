@@ -15,20 +15,21 @@ type SQLStorage struct {
 	StorageStruct
 }
 
-var (
-	DBs *sql.DB
-)
+// var (
+// 	DBs *sql.DB
+// )
 
 func NewSQLStorager(P *config.Param) Storager {
-	DBs = OpenDB(P)
-	return &SQLStorage{
-		DB: DBs,
+	// DBs := OpenDB(P)
+	return  &SQLStorage{
+		DB: OpenDB(P),
 		StorageStruct: StorageStruct{
 			UserID: "",
 			Key:    "",
 			Value:  "",
 		},
 	}
+	// return DBs
 }
 
 func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
@@ -167,8 +168,8 @@ func CreateDB(db *sql.DB) {
 	}
 }
 
-func CloseDB() {
-	err := DBs.Close()
+func (s *SQLStorage) CloseDB() {
+	err := s.DB.Close()
 	if err != nil {
 		log.Println(err)
 	}
