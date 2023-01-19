@@ -77,7 +77,7 @@ func TestRouter(t *testing.T) {
 			},
 		},
 	}
-	if Params.SaveFile == 2 {
+	if Params.SavePlace == 2 {
 		t.Run("Ping", func(t *testing.T) {
 			request1, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
 			require.NoError(t, err)

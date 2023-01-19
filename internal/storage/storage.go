@@ -4,11 +4,7 @@ import (
 	"crypto/md5"
 	"errors"
 	"fmt"
-	"log"
-	"os"
-	"os/signal"
 	"shortURL/internal/config"
-	"syscall"
 )
 
 var (
@@ -28,10 +24,10 @@ type Storager interface {
 }
 
 func NewStorage(P *config.Param) Storager {
-	switch P.SaveFile {
-	case 1:
+	switch P.SavePlace {
+	case config.SaveFile:
 		return NewFileStorager(P)
-	case 2:
+	case config.SaveSQL:
 		return NewSQLStorager(P)
 	default:
 		return NewMemoryStorager()
@@ -57,22 +53,4 @@ type MultiURL struct {
 	CorrID    string `json:"correlation_id"`
 	OriginURL string `json:"original_url,omitempty"`
 	ShortURL  string `json:"short_url,omitempty"`
-}
-
-func CloserDB(P *config.Param, S Storager) {
-	sigChan := make(chan os.Signal)
-	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	go func() {
-		for s := range sigChan {
-			switch s {
-			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				log.Println("Начинаем выход из программы")
-				if P.SaveFile == 2 {
-					S.CloseDB()
-				} else {
-					os.Exit(0)
-				}
-			}
-		}
-	}()
 }

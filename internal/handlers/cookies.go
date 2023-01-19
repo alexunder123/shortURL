@@ -18,27 +18,32 @@ var (
 
 type nameID string
 
+type MyCookie struct{
+	c http.Cookie
+}
+
+
 func Cookies(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var ID string
-		var c http.Cookie
+		var C MyCookie
 		for _, cookie := range r.Cookies() {
 			if cookie.Name == "shortener" {
-				c = *cookie
+				C.c = *cookie
 				break
 			}
 		}
-		err := CheckCookie(&c)
+		err := C.CheckCookie()
 		if err != nil {
 			log.Println(err)
-			ID, err = NewCookie(&c)
+			ID, err = C.GenerateCookie()
 			if err != nil {
 				log.Println(err)
 			} else {
-				http.SetCookie(w, &c)
+				http.SetCookie(w, &C.c)
 			}
 		} else {
-			ID, err = ReturnID(&c)
+			ID, err = C.ReturnID()
 			if err != nil {
 				log.Println(err)
 			}
@@ -48,7 +53,7 @@ func Cookies(next http.Handler) http.Handler {
 	})
 }
 
-func NewCookie(c *http.Cookie) (string, error) {
+func (c *MyCookie) GenerateCookie() (string, error) {
 	key := []byte("myShortenerURL00")
 	ID := RandomID(16)
 	aesblock, err := aes.NewCipher(key)
@@ -58,28 +63,28 @@ func NewCookie(c *http.Cookie) (string, error) {
 
 	dst := make([]byte, aes.BlockSize)
 	aesblock.Encrypt(dst, ID)
-	c.Name = "shortener"
-	c.Value = hex.EncodeToString(dst)
-	c.Path = "/"
-	c.Expires = time.Now().Add(time.Hour)
-	SaveID(string(ID))
+	c.c.Name = "shortener"
+	c.c.Value = hex.EncodeToString(dst)
+	c.c.Path = "/"
+	c.c.Expires = time.Now().Add(time.Hour)
+	baseID = append(baseID, string(ID))
 	return string(ID), nil
 }
 
-func CheckCookie(c *http.Cookie) error {
+func (c *MyCookie) CheckCookie() error {
 	//При проверке встроенной функцией выдает ошибку "invalid Cookie.Expires" в тесте fetch_urls
 	// err := c.Valid()
 	// if err != nil {
 	// 	return err
 	// }
 
-	if c.Name != "shortener" {
+	if c.c.Name != "shortener" {
 		return errors.New("invalid cookie name")
 	}
-	if c.Value == "" {
+	if c.c.Value == "" {
 		return errors.New("empty cookie value")
 	}
-	ID, err := ReturnID(c)
+	ID, err := c.ReturnID()
 	if err != nil {
 		return err
 	}
@@ -87,23 +92,19 @@ func CheckCookie(c *http.Cookie) error {
 	return err
 }
 
-func ReturnID(c *http.Cookie) (string, error) {
+func (c *MyCookie) ReturnID() (string, error) {
 	key := []byte("myShortenerURL00")
 	aesblock, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
 	ID := make([]byte, 16)
-	val, err := hex.DecodeString(c.Value)
+	val, err := hex.DecodeString(c.c.Value)
 	if err != nil {
 		return "", errors.New("cannot decode cookie")
 	}
 	aesblock.Decrypt(ID, val)
 	return string(ID), nil
-}
-
-func SaveID(ID string) {
-	baseID = append(baseID, ID)
 }
 
 func FindID(ID string) error {

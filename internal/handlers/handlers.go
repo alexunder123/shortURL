@@ -1,11 +1,7 @@
 package handlers
 
 import (
-	"encoding/json"
-	"io"
-	"log"
 	"net/http"
-	"net/url"
 	"shortURL/internal/config"
 	"shortURL/internal/storage"
 
@@ -27,143 +23,27 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 	r.Use(Cookies)
 
 	r.Post("/api/shorten/batch", func(w http.ResponseWriter, r *http.Request) {
-		var MultiURLs = make([]storage.MultiURL, 0)
-		bytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err = json.Unmarshal(bytes, &MultiURLs); err != nil {
-			http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
-			return
-		}
-		UserID := ReadContextID(r)
-		RMultiURLs, err := S.WriteMultiURL(&MultiURLs, UserID, P)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		RMultiURLsBZ, err := json.Marshal(RMultiURLs)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusCreated)
-		w.Write(RMultiURLsBZ)
+		batchPost(w, r, P, S)
 	})
 
 	r.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
-		var Addr PostURL
-		bytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if err = json.Unmarshal(bytes, &Addr); err != nil {
-			http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
-			return
-		}
-		_, err = url.Parse(Addr.GetURL)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "Wrong address!", http.StatusBadRequest)
-			return
-		}
-		UserID := ReadContextID(r)
-
-		key, err := S.SetShortURL(Addr.GetURL, UserID, P)
-		if err == storage.ErrConflict {
-			NewAddr := PostURL{SetURL: P.URL + "/" + key}
-			NewAddrBZ, err := json.Marshal(NewAddr)
-			if err != nil {
-				log.Println(err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json; charset=utf-8")
-			w.WriteHeader(http.StatusConflict)
-			w.Write(NewAddrBZ)
-			return
-		}
-		NewAddr := PostURL{SetURL: P.URL + "/" + key}
-		NewAddrBZ, err := json.Marshal(NewAddr)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusCreated)
-		w.Write(NewAddrBZ)
+		shortenPost(w, r, P, S)
 	})
 
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		UserID := ReadContextID(r)
-		bytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		fURL := string(bytes)
-		_, err = url.Parse(fURL)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "Wrong address!", http.StatusBadRequest)
-			return
-		}
-		key, err := S.SetShortURL(fURL, UserID, P)
-		if err == storage.ErrConflict {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(P.URL + "/" + key))
-			return
-		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(P.URL + "/" + key))
+		URLPost(w, r, P, S)
 	})
 
 	r.Get("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
-		UserID := ReadContextID(r)
-		URLsBZ, err := S.ReturnAllURLs(UserID, P)
-		if err == storage.ErrNoContent {
-			http.Error(w, err.Error(), http.StatusNoContent)
-			return
-		}
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		w.Write(URLsBZ)
+		URLsGet(w, r, P, S)
 	})
 
 	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
-		key := chi.URLParam(r, "id")
-		address := S.RetFullURL(key)
-		if address == "" {
-			http.Error(w, "Wrong address!", http.StatusBadRequest)
-		}
-		http.Redirect(w, r, address, http.StatusTemporaryRedirect)
+		idGet(w, r, P, S)
 	})
 
 	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-		err := S.CheckPing(P)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
+		pingGet(w, r, P, S)
 	})
 
 	return r

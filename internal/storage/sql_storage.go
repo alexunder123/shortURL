@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
-	"os"
 	"shortURL/internal/config"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -21,7 +20,7 @@ type SQLStorage struct {
 
 func NewSQLStorager(P *config.Param) Storager {
 	// DBs := OpenDB(P)
-	return  &SQLStorage{
+	return &SQLStorage{
 		DB: OpenDB(P),
 		StorageStruct: StorageStruct{
 			UserID: "",
@@ -174,5 +173,4 @@ func (s *SQLStorage) CloseDB() {
 		log.Println(err)
 	}
 	log.Println("db closed")
-	os.Exit(0)
 }

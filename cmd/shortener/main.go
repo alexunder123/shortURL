@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
+	"shortURL/internal/app"
 	"shortURL/internal/config"
 	"shortURL/internal/handlers"
 	"shortURL/internal/storage"
@@ -15,6 +17,10 @@ func main() {
 	log.Println("storage init")
 	r := handlers.NewRouter(params, store)
 	log.Println("handler init")
-	storage.CloserDB(params, store)
+	app.CloserDB(store)
+	go func() {
+		<-app.Stop
+		os.Exit(0)
+	}()
 	log.Fatal(http.ListenAndServe(params.Server, r))
 }

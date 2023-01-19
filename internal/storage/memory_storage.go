@@ -3,7 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"os"
+	"log"
 	"shortURL/internal/config"
 	"sync"
 )
@@ -87,5 +87,5 @@ func (s *MemoryStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Pa
 }
 
 func (s *MemoryStorage) CloseDB() {
-	os.Exit(0)
+	log.Println("closed")
 }

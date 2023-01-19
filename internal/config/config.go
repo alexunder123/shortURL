@@ -6,27 +6,35 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
+type SaveMethod int
+
+const (
+	SaveMemory SaveMethod = iota
+	SaveFile
+	SaveSQL
+)
+
 type Param struct {
-	Server   string `env:"SERVER_ADDRESS"`
-	URL      string `env:"BASE_URL"`
-	Storage  string `env:"FILE_STORAGE_PATH"`
-	SQL      string `env:"DATABASE_DSN"`
-	SaveFile int
+	Server    string `env:"SERVER_ADDRESS"`
+	URL       string `env:"BASE_URL"`
+	Storage   string `env:"FILE_STORAGE_PATH"`
+	SQL       string `env:"DATABASE_DSN"`
+	SavePlace SaveMethod
 }
 
 func NewConfig() *Param {
-	var Params Param
+	var params Param
 
-	err := env.Parse(&Params)
+	err := env.Parse(&params)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ReadFlags(&Params)
-	if Params.SQL != "" {
-		Params.SaveFile = 2
-	}else if Params.Storage != "" {
-		Params.SaveFile = 1
+	ReadFlags(&params)
+	if params.SQL != "" {
+		params.SavePlace = SaveSQL
+	} else if params.Storage != "" {
+		params.SavePlace = SaveFile
 	}
 
-	return &Params
+	return &params
 }

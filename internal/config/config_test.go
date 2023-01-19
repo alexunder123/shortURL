@@ -14,11 +14,11 @@ func TestGetEnv(t *testing.T) {
 		{
 			name: "test1",
 			want: &Param{
-				Server:   "127.0.0.1:8080",
-				URL:      "http://127.0.0.1:8080",
-				Storage:  "json_storage.json",
-				SQL: "PostgreSQL:localhost",
-				SaveFile: 2,
+				Server:    "127.0.0.1:8080",
+				URL:       "http://127.0.0.1:8080",
+				Storage:   "json_storage.json",
+				SQL:       "PostgreSQL:localhost",
+				SavePlace: 2,
 			},
 		},
 	}

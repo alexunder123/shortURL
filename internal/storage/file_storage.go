@@ -178,5 +178,4 @@ func (w *writerFile) Close() error {
 
 func (s *FileStorage) CloseDB() {
 	log.Println("file closed")
-	os.Exit(0)
 }
