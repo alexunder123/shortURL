@@ -14,12 +14,7 @@ type SQLStorage struct {
 	StorageStruct
 }
 
-// var (
-// 	DBs *sql.DB
-// )
-
 func NewSQLStorager(P *config.Param) Storager {
-	// DBs := OpenDB(P)
 	return &SQLStorage{
 		DB: OpenDB(P),
 		StorageStruct: StorageStruct{
@@ -28,7 +23,6 @@ func NewSQLStorager(P *config.Param) Storager {
 			Value:  "",
 		},
 	}
-	// return DBs
 }
 
 func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
@@ -161,7 +155,7 @@ func CreateDB(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, CONSTRAINT unique_query UNIQUE (user_id, value));")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, deleted boolean CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -21,7 +21,6 @@ func CloserDB(S storage.Storager) {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
 				log.Println("Начинаем выход из программы")
 				S.CloseDB()
-				// Stop <- 1
 				close(Stop)
 			}
 		}

@@ -46,5 +46,9 @@ func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
 		pingGet(w, r, P, S)
 	})
 
+	r.Delete("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
+		URLsDelete(w, r, P, S)
+	})
+
 	return r
 }
