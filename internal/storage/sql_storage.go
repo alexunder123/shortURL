@@ -155,7 +155,7 @@ func CreateDB(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, CONSTRAINT unique_query UNIQUE (user_id, value));")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, deleted boolean CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
 		log.Fatal(err)
 	}
