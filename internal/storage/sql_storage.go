@@ -153,7 +153,11 @@ func CreateDB(db *sql.DB) {
 	// }
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS ShortURL_GO12Alex(key text, user_id text, value text, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal(err)
+	}
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, CONSTRAINT unique_query UNIQUE (user_id, value));")
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
