@@ -1,4 +1,4 @@
-package handlers
+package router
 
 import (
 	"context"
@@ -18,12 +18,11 @@ var (
 
 type nameID string
 
-type MyCookie struct{
+type MyCookie struct {
 	c http.Cookie
 }
 
-
-func Cookies(next http.Handler) http.Handler {
+func MidWareCookies(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var ID string
 		var C MyCookie
@@ -33,20 +32,16 @@ func Cookies(next http.Handler) http.Handler {
 				break
 			}
 		}
-		err := C.CheckCookie()
+		ID, err := C.CheckCookie()
 		if err != nil {
 			log.Println(err)
 			ID, err = C.GenerateCookie()
 			if err != nil {
 				log.Println(err)
-			} else {
-				http.SetCookie(w, &C.c)
+				next.ServeHTTP(w, r)
+				return
 			}
-		} else {
-			ID, err = C.ReturnID()
-			if err != nil {
-				log.Println(err)
-			}
+			http.SetCookie(w, &C.c)
 		}
 		ctx := context.WithValue(r.Context(), name, ID)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -71,7 +66,7 @@ func (c *MyCookie) GenerateCookie() (string, error) {
 	return string(ID), nil
 }
 
-func (c *MyCookie) CheckCookie() error {
+func (c *MyCookie) CheckCookie() (string, error) {
 	//При проверке встроенной функцией выдает ошибку "invalid Cookie.Expires" в тесте fetch_urls
 	// err := c.Valid()
 	// if err != nil {
@@ -79,17 +74,17 @@ func (c *MyCookie) CheckCookie() error {
 	// }
 
 	if c.c.Name != "shortener" {
-		return errors.New("invalid cookie name")
+		return "", errors.New("invalid cookie name")
 	}
 	if c.c.Value == "" {
-		return errors.New("empty cookie value")
+		return "", errors.New("empty cookie value")
 	}
 	ID, err := c.ReturnID()
 	if err != nil {
-		return err
+		return "", err
 	}
 	err = FindID(ID)
-	return err
+	return ID, err
 }
 
 func (c *MyCookie) ReturnID() (string, error) {

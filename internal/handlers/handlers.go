@@ -1,50 +1,30 @@
 package handlers
 
 import (
-	"net/http"
 	"shortURL/internal/config"
 	"shortURL/internal/storage"
+	"shortURL/internal/router"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-type PostURL struct {
-	GetURL string `json:"url,omitempty"`
-	SetURL string `json:"result,omitempty"`
-}
+func NewRouter(P *config.Param, S storage.Storager) *router.Router {
+	r := router.Router{P: P, S: S}
+	r.Router = chi.NewRouter()
 
-func NewRouter(P *config.Param, S storage.Storager) *chi.Mux {
-	r := chi.NewRouter()
+	r.Router.Use(middleware.Logger)
+	r.Router.Use(middleware.Recoverer)
+	r.Router.Use(router.MidWareDecompress)
+	r.Router.Use(router.MidWareCookies)
 
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(Decompress)
-	r.Use(Cookies)
+	r.Router.Post("/api/shorten/batch", r.BatchPost)
+	r.Router.Post("/api/shorten", r.ShortenPost)
+	r.Router.Post("/", r.URLPost)
 
-	r.Post("/api/shorten/batch", func(w http.ResponseWriter, r *http.Request) {
-		batchPost(w, r, P, S)
-	})
+	r.Router.Get("/api/user/urls", r.URLsGet)
+	r.Router.Get("/{id}", r.IdGet)
+	r.Router.Get("/ping", r.PingGet)
 
-	r.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
-		shortenPost(w, r, P, S)
-	})
-
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		URLPost(w, r, P, S)
-	})
-
-	r.Get("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
-		URLsGet(w, r, P, S)
-	})
-
-	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
-		idGet(w, r, P, S)
-	})
-
-	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-		pingGet(w, r, P, S)
-	})
-
-	return r
+	return &r
 }

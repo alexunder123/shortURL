@@ -1,17 +1,16 @@
-package handlers
+package router
 
 import (
 	"log"
 	"net/http"
-	"shortURL/internal/config"
 	"shortURL/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 )
 
-func URLsGet(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.Storager) {
-	UserID := ReadContextID(r)
-	URLsBZ, err := S.ReturnAllURLs(UserID, P)
+func (m Router) URLsGet(w http.ResponseWriter, r *http.Request) {
+	userID := ReadContextID(r)
+	URLsBZ, err := m.S.ReturnAllURLs(userID, m.P)
 	if err == storage.ErrNoContent {
 		http.Error(w, err.Error(), http.StatusNoContent)
 		return
@@ -26,17 +25,17 @@ func URLsGet(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.
 	w.Write(URLsBZ)
 }
 
-func idGet(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.Storager) {
+func (m Router) IdGet(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "id")
-	address := S.RetFullURL(key)
+	address := m.S.RetFullURL(key)
 	if address == "" {
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 	}
 	http.Redirect(w, r, address, http.StatusTemporaryRedirect)
 }
 
-func pingGet(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.Storager) {
-	err := S.CheckPing(P)
+func (m Router) PingGet(w http.ResponseWriter, r *http.Request) {
+	err := m.S.CheckPing(m.P)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

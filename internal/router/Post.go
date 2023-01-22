@@ -1,4 +1,4 @@
-package handlers
+package router
 
 import (
 	"encoding/json"
@@ -6,11 +6,10 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"shortURL/internal/config"
 	"shortURL/internal/storage"
 )
 
-func batchPost(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.Storager) {
+func (m Router) BatchPost(w http.ResponseWriter, r *http.Request) {
 	var MultiURLs = make([]storage.MultiURL, 0)
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -22,8 +21,8 @@ func batchPost(w http.ResponseWriter, r *http.Request, P *config.Param, S storag
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 		return
 	}
-	UserID := ReadContextID(r)
-	RMultiURLs, err := S.WriteMultiURL(&MultiURLs, UserID, P)
+	userID := ReadContextID(r)
+	RMultiURLs, err := m.S.WriteMultiURL(&MultiURLs, userID, m.P)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -40,7 +39,7 @@ func batchPost(w http.ResponseWriter, r *http.Request, P *config.Param, S storag
 	w.Write(RMultiURLsBZ)
 }
 
-func shortenPost(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.Storager) {
+func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
 	var Addr PostURL
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -58,11 +57,11 @@ func shortenPost(w http.ResponseWriter, r *http.Request, P *config.Param, S stor
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 		return
 	}
-	UserID := ReadContextID(r)
+	userID := ReadContextID(r)
 
-	key, err := S.SetShortURL(Addr.GetURL, UserID, P)
+	key, err := m.S.SetShortURL(Addr.GetURL, userID, m.P)
 	if err == storage.ErrConflict {
-		NewAddr := PostURL{SetURL: P.URL + "/" + key}
+		NewAddr := PostURL{SetURL: m.P.URL + "/" + key}
 		NewAddrBZ, err := json.Marshal(NewAddr)
 		if err != nil {
 			log.Println(err)
@@ -74,7 +73,7 @@ func shortenPost(w http.ResponseWriter, r *http.Request, P *config.Param, S stor
 		w.Write(NewAddrBZ)
 		return
 	}
-	NewAddr := PostURL{SetURL: P.URL + "/" + key}
+	NewAddr := PostURL{SetURL: m.P.URL + "/" + key}
 	NewAddrBZ, err := json.Marshal(NewAddr)
 	if err != nil {
 		log.Println(err)
@@ -86,8 +85,8 @@ func shortenPost(w http.ResponseWriter, r *http.Request, P *config.Param, S stor
 	w.Write(NewAddrBZ)
 }
 
-func URLPost(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.Storager) {
-	UserID := ReadContextID(r)
+func (m Router) URLPost(w http.ResponseWriter, r *http.Request) {
+	userID := ReadContextID(r)
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
@@ -101,14 +100,14 @@ func URLPost(w http.ResponseWriter, r *http.Request, P *config.Param, S storage.
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 		return
 	}
-	key, err := S.SetShortURL(fURL, UserID, P)
+	key, err := m.S.SetShortURL(fURL, userID, m.P)
 	if err == storage.ErrConflict {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(P.URL + "/" + key))
+		w.Write([]byte(m.P.URL + "/" + key))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(P.URL + "/" + key))
+	w.Write([]byte(m.P.URL + "/" + key))
 }

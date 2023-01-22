@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"shortURL/internal/config"
+	"shortURL/internal/router"
 	"shortURL/internal/storage"
 	"testing"
 
@@ -26,7 +27,7 @@ func TestRouter(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	ts := httptest.NewUnstartedServer(r)
+	ts := httptest.NewUnstartedServer(r.Router)
 	ts.Listener.Close()
 	ts.Listener = l
 	ts.Start()
@@ -100,7 +101,7 @@ func TestRouter(t *testing.T) {
 				request1, err = http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
 				require.NoError(t, err)
 			case "application/json; charset=utf-8":
-				var req PostURL
+				var req router.PostURL
 				req.GetURL = string(tt.request)
 				reqBz, err := json.Marshal(req)
 				if err != nil {
@@ -133,7 +134,7 @@ func TestRouter(t *testing.T) {
 				request3, err = http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
 				require.NoError(t, err)
 			case "application/json; charset=utf-8":
-				var req PostURL
+				var req router.PostURL
 				req.GetURL = string(tt.request)
 				reqBz, err := json.Marshal(req)
 				if err != nil {
@@ -156,7 +157,7 @@ func TestRouter(t *testing.T) {
 				request2, err = http.NewRequest(http.MethodGet, string(userResult), nil)
 				require.NoError(t, err)
 			case "application/json; charset=utf-8":
-				var res PostURL
+				var res router.PostURL
 				err := json.Unmarshal(userResult, &res)
 				if err != nil {
 					panic(err)
