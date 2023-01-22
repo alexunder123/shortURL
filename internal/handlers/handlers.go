@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"shortURL/internal/config"
-	"shortURL/internal/storage"
 	"shortURL/internal/router"
+	"shortURL/internal/storage"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -23,7 +23,7 @@ func NewRouter(P *config.Param, S storage.Storager) *router.Router {
 	r.Router.Post("/", r.URLPost)
 
 	r.Router.Get("/api/user/urls", r.URLsGet)
-	r.Router.Get("/{id}", r.IdGet)
+	r.Router.Get("/{id}", r.IDGet)
 	r.Router.Get("/ping", r.PingGet)
 
 	return &r

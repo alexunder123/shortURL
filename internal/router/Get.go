@@ -25,7 +25,7 @@ func (m Router) URLsGet(w http.ResponseWriter, r *http.Request) {
 	w.Write(URLsBZ)
 }
 
-func (m Router) IdGet(w http.ResponseWriter, r *http.Request) {
+func (m Router) IDGet(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "id")
 	address := m.S.RetFullURL(key)
 	if address == "" {
