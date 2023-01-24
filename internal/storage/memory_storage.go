@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"shortURL/internal/config"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -31,19 +32,26 @@ func (s *MemoryStorage) SetShortURL(fURL, userID string, Params *config.Param) (
 		}
 	}
 
-	s.Lock()
-	s.baseURL[key] = fURL
-	s.userURL[key] = userID
-	s.Unlock()
-	return key, nil
+	var mutex sync.RWMutex
+	mutex.Lock()
+	BaseURL[s.Key] = fURL
+	UserURL[s.Key] = UserID
+	mutex.Unlock()
+	return s.Key, nil
 }
 
-func (s *MemoryStorage) RetFullURL(key string) (string, error) {
+func (s *MemoryStorage) RetFullURL(key string) string {
+	s.RLock()
+	del := s.DeletedURL[key]
+	s.RUnlock()
+	if del {
+		return "", ErrGone
+	}
 	return s.baseURL[key], nil
 }
 
-func (s *MemoryStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
-	if len(s.baseURL) == 0 {
+func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
+	if len(BaseURL) == 0 {
 		return nil, ErrNoContent
 	}
 	var AllURLs = make([]URLs, 0)

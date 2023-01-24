@@ -32,6 +32,9 @@ func (m Router) URLsGet(w http.ResponseWriter, r *http.Request) {
 func (m Router) IDGet(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "id")
 	address, err := m.Str.RetFullURL(key)
+	if err == storage.ErrGone {
+		http.Error(w, "URL Deleted", http.StatusGone)
+	}
 	if err != nil {
 		log.Error().Err(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

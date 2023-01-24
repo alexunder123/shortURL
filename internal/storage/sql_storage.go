@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"shortURL/internal/config"
+	"strings"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog/log"
@@ -52,7 +53,8 @@ func (s *SQLStorage) SetShortURL(fURL, userID string, Params *config.Param) (str
 
 func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	var value string
-	row, err := s.DB.Query("SELECT value FROM ShortURL_GO12Alex WHERE key = $1", key)
+	var deleted bool
+	row, err := s.DB.Query("SELECT value, deleted FROM ShortURL_GO12Alex WHERE key = $1", key)
 	if err != nil {
 		return "", err
 	}
@@ -61,10 +63,13 @@ func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	}
 	defer row.Close()
 	for row.Next() {
-		err = row.Scan(&value)
+		err = row.Scan(&value, &deleted)
 		if err != nil {
 			return "", err
 		}
+	}
+	if deleted {
+		return "", ErrGone
 	}
 	return value, nil
 }
@@ -155,7 +160,7 @@ func CreateDB(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, deleted boolean CONSTRAINT unique_query UNIQUE (user_id, value));")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
 		log.Fatal(err)
 	}

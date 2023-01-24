@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"

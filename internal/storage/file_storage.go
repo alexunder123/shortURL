@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"shortURL/internal/config"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -36,8 +37,9 @@ func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (st
 
 	var mutex sync.Mutex
 	mutex.Lock()
-	s.baseURL[key] = fURL
-	s.userURL[key] = UserID
+	BaseURL[key] = fURL
+	UserURL[key] = UserID
+	DeletedURL[key] = false
 	mutex.Unlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
@@ -48,7 +50,14 @@ func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (st
 	return key, nil
 }
 
-func (s *FileStorage) RetFullURL(key string) (string, error) {
+func (s *FileStorage) RetFullURL(key string) string {
+	s.RLock()
+	del := DeletedURL[key]
+	s.RUnlock()
+	if del {
+		return "", ErrGone
+	}
+	
 	return s.baseURL[key], nil
 }
 
@@ -94,8 +103,9 @@ func (s *FileStorage) WriteMultiURL(m []MultiURL, UserID string, P *config.Param
 		key := HashStr(v.OriginURL)
 		var mutex sync.RWMutex
 		mutex.Lock()
-		s.baseURL[key] = v.OriginURL
-		s.userURL[key] = UserID
+		BaseURL[Key] = v.OriginURL
+		UserURL[Key] = UserID
+		DeletedURL[s.Key] = false
 		mutex.Unlock()
 		file.WriteFile(key, UserID, v.OriginURL)
 		r[i].CorrID = v.CorrID
@@ -139,8 +149,9 @@ func (r *readerFile) ReadFile(fs *FileStorage) {
 			log.Error().Err(err)
 			return
 		}
-		fs.baseURL[t.Key] = t.Value
-		fs.userURL[t.Key] = t.UserID
+		BaseURL[t.Key] = t.Value
+		UserURL[t.Key] = t.UserID
+		DeletedURL[t.Key] = t.Deleted
 	}
 }
 
@@ -165,7 +176,7 @@ func NewWriterFile(P *config.Param) (*writerFile, error) {
 }
 
 func (w *writerFile) WriteFile(key, userID, value string) {
-	t := StorageStruct{UserID: userID, Key: key, Value: value}
+	t := StorageStruct{UserID: userID, Key: key, Value: value, Deleted: false}
 	err := w.encoder.Encode(&t)
 	if err != nil {
 		log.Error().Err(err)
