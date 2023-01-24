@@ -26,5 +26,7 @@ func NewRouter(P *config.Param, S storage.Storager) *router.Router {
 	r.Router.Get("/{id}", r.IDGet)
 	r.Router.Get("/ping", r.PingGet)
 
+	r.Router.Delete("/api/user/urls", r.URLsDelete)
+
 	return &r
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"shortURL/internal/config"
+	"strings"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -28,7 +29,7 @@ func NewSQLStorager(P *config.Param) Storager {
 func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
 	s.Key = HashStr(fURL)
 
-	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", s.Key, UserID, fURL)
+	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", s.Key, UserID, fURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,23 +57,27 @@ func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (str
 	return s.Key, nil
 }
 
-func (s *SQLStorage) RetFullURL(key string) string {
+func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	var value string
-	row, err := s.DB.Query("SELECT value FROM GO12Alex WHERE key = $1", key)
+	var deleted bool
+	row, err := s.DB.Query("SELECT value, deleted FROM GO12Alex WHERE key = $1", key)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	if err := row.Err(); err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	defer row.Close()
 	for row.Next() {
-		err = row.Scan(&value)
+		err = row.Scan(&value, &deleted)
 		if err != nil {
-			log.Fatal(err)
+			return "", err
 		}
 	}
-	return value
+	if deleted {
+		return "", ErrGone
+	}
+	return value, nil
 }
 
 func (s *SQLStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
@@ -118,7 +123,7 @@ func (s *SQLStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param
 	if err != nil {
 		return nil, err
 	}
-	stmt, err := tx.Prepare("INSERT INTO GO12Alex(key, user_id, value) VALUES($1, $2, $3)")
+	stmt, err := tx.Prepare("INSERT INTO GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false)")
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +160,7 @@ func CreateDB(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, deleted boolean CONSTRAINT unique_query UNIQUE (user_id, value));")
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,4 +172,61 @@ func (s *SQLStorage) CloseDB() {
 		log.Println(err)
 	}
 	log.Println("db closed")
+}
+
+func (s *SQLStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+	inputCh := make(chan string)
+	go func() {
+		for _, del := range *DeleteURLs {
+			inputCh <- del
+		}
+		close(inputCh)
+	}()
+
+	chQ := 5 //Количество каналов для работы
+	//fan out
+	fanOutChs := fanOut(inputCh, chQ)
+	workerChs := make([]chan string, 0, chQ)
+	for _, fanOutCh := range fanOutChs {
+		workerCh := make(chan string)
+		s.newWorker(fanOutCh, workerCh, UserID)
+		workerChs = append(workerChs, workerCh)
+	}
+
+	//fan in
+	outCh := fanIn(workerChs)
+
+	//update
+	stmt, err := s.DB.Prepare("UPDATE GO12Alex SET deleted=true WHERE key=$1 AND user_id=$2")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer stmt.Close()
+	for key := range outCh {
+		if _, err = stmt.Exec(key, UserID); err != nil {
+			log.Println(err)
+			return
+		}
+	}
+}
+
+func (s *SQLStorage) newWorker(in, out chan string, UserID string) {
+	go func() {
+		stmt, err := s.DB.Prepare("SELECT value FROM GO12Alex WHERE key = $1 AND user_id = $2")
+		if err != nil {
+			return
+		}
+		defer stmt.Close()
+		for myURL := range in {
+			key := strings.Trim(myURL, "\"")
+			row := stmt.QueryRow(key, UserID)
+			if err := row.Err(); err != nil {
+				log.Println(err)
+				return
+			}
+			out <- key
+		}
+		close(out)
+	}()
 }

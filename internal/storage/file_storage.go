@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"shortURL/internal/config"
+	"strings"
 	"sync"
 )
 
@@ -37,6 +38,7 @@ func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (st
 	mutex.Lock()
 	BaseURL[s.Key] = fURL
 	UserURL[s.Key] = UserID
+	DeletedURL[s.Key] = false
 	mutex.Unlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
@@ -47,8 +49,15 @@ func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (st
 	return s.Key, nil
 }
 
-func (s *FileStorage) RetFullURL(key string) string {
-	return BaseURL[key]
+func (s *FileStorage) RetFullURL(key string) (string, error) {
+	var mutex sync.RWMutex
+	mutex.Lock()
+	del := DeletedURL[s.Key]
+	mutex.Unlock()
+	if del {
+		return "", ErrGone
+	}
+	return BaseURL[key], nil
 }
 
 type readerFile struct {
@@ -96,6 +105,7 @@ func (s *FileStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Para
 		mutex.Lock()
 		BaseURL[Key] = v.OriginURL
 		UserURL[Key] = UserID
+		DeletedURL[s.Key] = false
 		mutex.Unlock()
 		file.WriteFile(s.Key, UserID, v.OriginURL)
 		r[i].CorrID = v.CorrID
@@ -141,6 +151,7 @@ func (r *readerFile) ReadFile() {
 		}
 		BaseURL[t.Key] = t.Value
 		UserURL[t.Key] = t.UserID
+		DeletedURL[t.Key] = t.Deleted
 	}
 }
 
@@ -165,7 +176,7 @@ func NewWriterFile(P *config.Param) (*writerFile, error) {
 }
 
 func (w *writerFile) WriteFile(key, userID, value string) {
-	t := StorageStruct{UserID: userID, Key: key, Value: value}
+	t := StorageStruct{UserID: userID, Key: key, Value: value, Deleted: false}
 	err := w.encoder.Encode(&t)
 	if err != nil {
 		log.Println(err)
@@ -178,4 +189,49 @@ func (w *writerFile) Close() error {
 
 func (s *FileStorage) CloseDB() {
 	log.Println("file closed")
+}
+
+func (s *FileStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+	inputCh := make(chan string)
+	go func() {
+		for _, del := range *DeleteURLs {
+			inputCh <- del
+		}
+		close(inputCh)
+	}()
+
+	chQ := 5 //Количество каналов для работы
+	//fan out
+	fanOutChs := fanOut(inputCh, chQ)
+	workerChs := make([]chan string, 0, chQ)
+	for _, fanOutCh := range fanOutChs {
+		workerCh := make(chan string)
+		s.newWorker(fanOutCh, workerCh, UserID)
+		workerChs = append(workerChs, workerCh)
+	}
+
+	//fan in
+	outCh := fanIn(workerChs)
+
+	//update
+	for key := range outCh {
+		DeletedURL[key] = true
+	}
+}
+
+func (s *FileStorage) newWorker(in, out chan string, UserID string) {
+	go func() {
+		for myURL := range in {
+			key := strings.Trim(myURL, "\"")
+			var mutex sync.RWMutex
+			mutex.Lock()
+			id := UserURL[s.Key]
+			mutex.Unlock()
+			if id != UserID {
+				continue
+			}
+			out <- key
+		}
+		close(out)
+	}()
 }

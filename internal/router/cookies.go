@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -62,7 +63,10 @@ func (c *MyCookie) GenerateCookie() (string, error) {
 	c.c.Value = hex.EncodeToString(dst)
 	c.c.Path = "/"
 	c.c.Expires = time.Now().Add(time.Hour)
+	var mutex sync.RWMutex
+	mutex.Lock()
 	baseID = append(baseID, string(ID))
+	mutex.Unlock()
 	return string(ID), nil
 }
 
@@ -103,11 +107,14 @@ func (c *MyCookie) ReturnID() (string, error) {
 }
 
 func FindID(ID string) error {
+	var mutex sync.RWMutex
+	mutex.Lock()
 	for _, value := range baseID {
 		if ID == value {
 			return nil
 		}
 	}
+	mutex.Unlock()
 	return errors.New("invalid ID")
 }
 
