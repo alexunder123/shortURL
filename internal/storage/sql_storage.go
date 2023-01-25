@@ -173,3 +173,60 @@ func (s *SQLStorage) CloseDB() {
 	}
 	log.Info().Msg("db closed")
 }
+
+func (s *SQLStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+	inputCh := make(chan string)
+	go func() {
+		for _, del := range *DeleteURLs {
+			inputCh <- del
+		}
+		close(inputCh)
+	}()
+
+	chQ := 5 //Количество каналов для работы
+	//fan out
+	fanOutChs := fanOut(inputCh, chQ)
+	workerChs := make([]chan string, 0, chQ)
+	for _, fanOutCh := range fanOutChs {
+		workerCh := make(chan string)
+		s.newWorker(fanOutCh, workerCh, UserID)
+		workerChs = append(workerChs, workerCh)
+	}
+
+	//fan in
+	outCh := fanIn(workerChs)
+
+	//update
+	stmt, err := s.DB.Prepare("UPDATE GO12Alex SET deleted=true WHERE key=$1 AND user_id=$2")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer stmt.Close()
+	for key := range outCh {
+		if _, err = stmt.Exec(key, UserID); err != nil {
+			log.Println(err)
+			return
+		}
+	}
+}
+
+func (s *SQLStorage) newWorker(in, out chan string, UserID string) {
+	go func() {
+		stmt, err := s.DB.Prepare("SELECT value FROM GO12Alex WHERE key = $1 AND user_id = $2")
+		if err != nil {
+			return
+		}
+		defer stmt.Close()
+		for myURL := range in {
+			key := strings.Trim(myURL, "\"")
+			row := stmt.QueryRow(key, UserID)
+			if err := row.Err(); err != nil {
+				log.Println(err)
+				return
+			}
+			out <- key
+		}
+		close(out)
+	}()
+}
