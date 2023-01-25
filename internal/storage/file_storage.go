@@ -36,10 +36,10 @@ func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (st
 	}
 
 	var mutex sync.Mutex
-	mutex.Lock()
-	BaseURL[key] = fURL
-	UserURL[key] = UserID
-	DeletedURL[key] = false
+	s.RLock()
+	s.baseURL[key] = fURL
+	s.userURL[key] = UserID
+	s.deletedURL[key] = false
 	mutex.Unlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
@@ -52,7 +52,7 @@ func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (st
 
 func (s *FileStorage) RetFullURL(key string) string {
 	s.RLock()
-	del := DeletedURL[key]
+	del := s.deletedURL[key]
 	s.RUnlock()
 	if del {
 		return "", ErrGone
@@ -149,9 +149,11 @@ func (r *readerFile) ReadFile(fs *FileStorage) {
 			log.Error().Err(err)
 			return
 		}
+		Mutex.Lock()
 		BaseURL[t.Key] = t.Value
 		UserURL[t.Key] = t.UserID
 		DeletedURL[t.Key] = t.Deleted
+		Mutex.Unlock()
 	}
 }
 
@@ -189,4 +191,48 @@ func (w *writerFile) Close() error {
 
 func (s *FileStorage) CloseDB() {
 	log.Info().Msg("file closed")
+}
+
+func (s *FileStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+	inputCh := make(chan string)
+	go func() {
+		for _, del := range *DeleteURLs {
+			inputCh <- del
+		}
+		close(inputCh)
+	}()
+
+	chQ := 5 //Количество каналов для работы
+	//fan out
+	fanOutChs := fanOut(inputCh, chQ)
+	workerChs := make([]chan string, 0, chQ)
+	for _, fanOutCh := range fanOutChs {
+		workerCh := make(chan string)
+		s.newWorker(fanOutCh, workerCh, UserID)
+		workerChs = append(workerChs, workerCh)
+	}
+
+	//fan in
+	outCh := fanIn(workerChs)
+
+	//update
+	for key := range outCh {
+		DeletedURL[key] = true
+	}
+}
+
+func (s *FileStorage) newWorker(in, out chan string, UserID string) {
+	go func() {
+		for myURL := range in {
+			key := strings.Trim(myURL, "\"")
+			s.RLock()
+			id := UserURL[key]
+			s.RUnlock()
+			if id != UserID {
+				continue
+			}
+			out <- key
+		}
+		close(out)
+	}()
 }

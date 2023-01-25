@@ -32,12 +32,9 @@ func (s *MemoryStorage) SetShortURL(fURL, userID string, Params *config.Param) (
 		}
 	}
 
-	var mutex sync.RWMutex
-	mutex.Lock()
-	BaseURL[s.Key] = fURL
-	UserURL[s.Key] = UserID
-	mutex.Unlock()
-	return s.Key, nil
+	BaseURL[key] = fURL
+	UserURL[key] = UserID
+	return key, nil
 }
 
 func (s *MemoryStorage) RetFullURL(key string) string {
@@ -62,7 +59,7 @@ func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, e
 			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
 		}
 	}
-	mutex.Unlock()
+	Mutex.Unlock()
 	if len(AllURLs) == 0 {
 		return nil, ErrNoContent
 	}
@@ -94,4 +91,52 @@ func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Par
 
 func (s *MemoryStorage) CloseDB() {
 	log.Info().Msg("closed")
+}
+
+func (s *MemoryStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+	inputCh := make(chan string)
+	go func() {
+		for _, del := range *DeleteURLs {
+			inputCh <- del
+		}
+		close(inputCh)
+	}()
+
+	chQ := 5 //Количество каналов для работы
+	//fan out
+	fanOutChs := fanOut(inputCh, chQ)
+	workerChs := make([]chan string, 0, chQ)
+	for _, fanOutCh := range fanOutChs {
+		workerCh := make(chan string)
+		s.newWorker(fanOutCh, workerCh, UserID)
+		workerChs = append(workerChs, workerCh)
+	}
+
+	//fan in
+	outCh := fanIn(workerChs)
+
+	//update
+	var mutex sync.Mutex
+	mutex.Lock()
+	for key := range outCh {
+		DeletedURL[key] = true
+	}
+	mutex.Unlock()
+}
+
+func (s *MemoryStorage) newWorker(in, out chan string, UserID string) {
+	go func() {
+		for myURL := range in {
+			key := strings.Trim(myURL, "\"")
+			var mutex sync.RWMutex
+			mutex.Lock()
+			id := UserURL[s.Key]
+			mutex.Unlock()
+			if id != UserID {
+				continue
+			}
+			out <- key
+		}
+		close(out)
+	}()
 }
