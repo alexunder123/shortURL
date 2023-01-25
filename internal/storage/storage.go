@@ -15,6 +15,7 @@ var (
 	ErrNoContent error = errors.New("StatusNoContent")
 	ErrConflict  error = errors.New("StatusConflict")
 	ErrGone      error = errors.New("StatusGone")
+	Mutex sync.RWMutex
 )
 
 type Storager interface {

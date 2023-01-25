@@ -27,9 +27,9 @@ func NewSQLStorager(P *config.Param) Storager {
 }
 
 func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
-	s.Key = HashStr(fURL)
+	key := HashStr(fURL)
 
-	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", s.Key, UserID, fURL)
+	result, err := s.DB.Exec("INSERT INTO GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", key, UserID, fURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func (s *SQLStorage) SetShortURL(fURL, UserID string, Params *config.Param) (str
 			}
 		}
 	}
-	return s.Key, nil
+	return key, nil
 }
 
 func (s *SQLStorage) RetFullURL(key string) (string, error) {

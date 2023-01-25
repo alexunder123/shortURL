@@ -24,29 +24,27 @@ func NewMemoryStorager() Storager {
 }
 
 func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
-	s.Key = HashStr(fURL)
-	_, true := BaseURL[s.Key]
+	key := HashStr(fURL)
+	Mutex.RLock()
+	defer Mutex.RUnlock()
+	_, true := BaseURL[key]
 	if true {
-		if UserURL[s.Key] == UserID {
-			return s.Key, ErrConflict
+		if UserURL[key] == UserID {
+			return key, ErrConflict
 		}
 	}
 
-	var mutex sync.RWMutex
-	mutex.Lock()
-	BaseURL[s.Key] = fURL
-	UserURL[s.Key] = UserID
-	mutex.Unlock()
-	return s.Key, nil
+	BaseURL[key] = fURL
+	UserURL[key] = UserID
+	return key, nil
 }
 
 func (s *MemoryStorage) RetFullURL(key string) (string, error) {
-	var mutex sync.RWMutex
-	mutex.Lock()
-	if DeletedURL[s.Key] {
+	Mutex.RLock()
+	defer Mutex.RUnlock()
+	if DeletedURL[key] {
 		return "", ErrGone
 	}
-	mutex.Unlock()
 	return BaseURL[key], nil
 }
 
@@ -55,14 +53,13 @@ func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, e
 		return nil, ErrNoContent
 	}
 	var AllURLs = make([]URLs, 0)
-	var mutex sync.Mutex
-	mutex.Lock()
+	Mutex.Lock()
 	for key, value := range BaseURL {
 		if UserURL[key] == UserID {
 			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
 		}
 	}
-	mutex.Unlock()
+	Mutex.Unlock()
 	if len(AllURLs) == 0 {
 		return nil, ErrNoContent
 	}
@@ -81,11 +78,10 @@ func (s *MemoryStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Pa
 	r := make([]MultiURL, len(*m))
 	for i, v := range *m {
 		Key := HashStr(v.OriginURL)
-		var mutex sync.RWMutex
-		mutex.Lock()
+		Mutex.Lock()
 		BaseURL[Key] = v.OriginURL
 		UserURL[Key] = UserID
-		mutex.Unlock()
+		Mutex.Unlock()
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(P.URL + "/" + Key)
 	}
@@ -120,21 +116,23 @@ func (s *MemoryStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *conf
 	outCh := fanIn(workerChs)
 
 	//update
-	var mutex sync.Mutex
-	mutex.Lock()
+	
 	for key := range outCh {
+		Mutex.Lock()
 		DeletedURL[key] = true
+		Mutex.Unlock()
 	}
-	mutex.Unlock()
+	
 }
 
 func (s *MemoryStorage) newWorker(in, out chan string, UserID string) {
 	go func() {
 		for myURL := range in {
 			key := strings.Trim(myURL, "\"")
+			// log.Println("key:", key)
 			var mutex sync.RWMutex
 			mutex.Lock()
-			id := UserURL[s.Key]
+			id := UserURL[key]
 			mutex.Unlock()
 			if id != UserID {
 				continue

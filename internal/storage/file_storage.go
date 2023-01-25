@@ -7,7 +7,6 @@ import (
 	"os"
 	"shortURL/internal/config"
 	"strings"
-	"sync"
 )
 
 type FileStorage struct {
@@ -26,34 +25,32 @@ func NewFileStorager(P *config.Param) Storager {
 }
 
 func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
-	s.Key = HashStr(fURL)
-	_, true := BaseURL[s.Key]
+	key := HashStr(fURL)
+	_, true := BaseURL[key]
 	if true {
-		if UserURL[s.Key] == UserID {
-			return s.Key, ErrConflict
+		if UserURL[key] == UserID {
+			return key, ErrConflict
 		}
 	}
 
-	var mutex sync.Mutex
-	mutex.Lock()
-	BaseURL[s.Key] = fURL
-	UserURL[s.Key] = UserID
-	DeletedURL[s.Key] = false
-	mutex.Unlock()
+	Mutex.Lock()
+	BaseURL[key] = fURL
+	UserURL[key] = UserID
+	DeletedURL[key] = false
+	Mutex.Unlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-	file.WriteFile(s.Key, UserID, fURL)
-	return s.Key, nil
+	file.WriteFile(key, UserID, fURL)
+	return key, nil
 }
 
 func (s *FileStorage) RetFullURL(key string) (string, error) {
-	var mutex sync.RWMutex
-	mutex.Lock()
+	Mutex.RLock()
+	defer Mutex.RUnlock()
 	del := DeletedURL[s.Key]
-	mutex.Unlock()
 	if del {
 		return "", ErrGone
 	}
@@ -70,14 +67,13 @@ func (s *FileStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, err
 		return nil, ErrNoContent
 	}
 	var AllURLs = make([]URLs, 0)
-	var mutex sync.Mutex
-	mutex.Lock()
+	Mutex.Lock()
 	for key, value := range BaseURL {
 		if UserURL[key] == UserID {
 			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
 		}
 	}
-	mutex.Unlock()
+	Mutex.Unlock()
 	if len(AllURLs) == 0 {
 		return nil, ErrNoContent
 	}
@@ -101,12 +97,11 @@ func (s *FileStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Para
 	defer file.Close()
 	for i, v := range *m {
 		Key := HashStr(v.OriginURL)
-		var mutex sync.RWMutex
-		mutex.Lock()
+		Mutex.Lock()
 		BaseURL[Key] = v.OriginURL
 		UserURL[Key] = UserID
 		DeletedURL[s.Key] = false
-		mutex.Unlock()
+		Mutex.Unlock()
 		file.WriteFile(s.Key, UserID, v.OriginURL)
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(P.URL + "/" + Key)
@@ -149,9 +144,11 @@ func (r *readerFile) ReadFile() {
 			log.Println(err)
 			return
 		}
+		Mutex.Lock()
 		BaseURL[t.Key] = t.Value
 		UserURL[t.Key] = t.UserID
 		DeletedURL[t.Key] = t.Deleted
+		Mutex.Unlock()
 	}
 }
 
@@ -223,10 +220,9 @@ func (s *FileStorage) newWorker(in, out chan string, UserID string) {
 	go func() {
 		for myURL := range in {
 			key := strings.Trim(myURL, "\"")
-			var mutex sync.RWMutex
-			mutex.Lock()
+			Mutex.RLock()
 			id := UserURL[s.Key]
-			mutex.Unlock()
+			Mutex.Unlock()
 			if id != UserID {
 				continue
 			}
