@@ -274,6 +274,8 @@ func TestRouter(t *testing.T) {
 		require.NoError(t, err)
 		result, err := http.DefaultClient.Do(request0)
 		require.NoError(t, err)
+		err = result.Body.Close()
+		require.NoError(t, err)
 		var c http.Cookie
 		for _, cookie := range result.Cookies() {
 			if cookie.Name == "shortener" {

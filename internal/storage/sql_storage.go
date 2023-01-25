@@ -220,6 +220,7 @@ func (s *SQLStorage) newWorker(in, out chan string, UserID string) {
 		defer stmt.Close()
 		for myURL := range in {
 			key := strings.Trim(myURL, "\"")
+			log.Println("key to delete:", key)
 			row := stmt.QueryRow(key, UserID)
 			if err := row.Err(); err != nil {
 				log.Println(err)

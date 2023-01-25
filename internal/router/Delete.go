@@ -20,6 +20,7 @@ func (m Router) URLsDelete(w http.ResponseWriter, r *http.Request) {
 	URLs := string(URLsBZ)
 	DeleteURLs := strings.Split(URLs, ",")
 	userID := ReadContextID(r)
+	log.Println("Received URLs to delete:", DeleteURLs)
 	go m.S.MarkDeleted(&DeleteURLs, userID, m.P)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusAccepted)
