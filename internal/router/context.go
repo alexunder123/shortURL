@@ -6,11 +6,11 @@ import (
 )
 
 func ReadContextID(r *http.Request) string {
-	UserID := r.Context()
-	ID := UserID.Value(name)
-	if ID == nil {
+	context := r.Context()
+	id := context.Value(USER_ID)
+	if id == nil {
 		return ""
 	}
-	IDs := fmt.Sprintf("%s", ID)
-	return IDs
+	ids := fmt.Sprintf("%s", id)
+	return ids
 }

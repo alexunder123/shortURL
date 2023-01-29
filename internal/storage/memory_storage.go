@@ -3,55 +3,54 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"shortURL/internal/config"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type MemoryStorage struct {
-	StorageStruct
+	baseURL map[string]string
+	userURL map[string]string
+	sync.RWMutex
 }
 
 func NewMemoryStorager() Storager {
 	return &MemoryStorage{
-		StorageStruct: StorageStruct{
-			UserID: "",
-			Key:    "",
-			Value:  "",
-		},
+		baseURL: make(map[string]string),
+		userURL: make(map[string]string),
 	}
 }
 
-func (s *MemoryStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
-	s.Key = HashStr(fURL)
-	_, true := BaseURL[s.Key]
+func (s *MemoryStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
+	key := HashStr(fURL)
+	_, true := s.baseURL[key]
 	if true {
-		if UserURL[s.Key] == UserID {
-			return s.Key, ErrConflict
+		if s.userURL[key] == userID {
+			return key, ErrConflict
 		}
 	}
 
-	var mutex sync.RWMutex
-	mutex.Lock()
-	BaseURL[s.Key] = fURL
-	UserURL[s.Key] = UserID
-	mutex.Unlock()
-	return s.Key, nil
+	s.Lock()
+	s.baseURL[key] = fURL
+	s.userURL[key] = userID
+	s.Unlock()
+	return key, nil
 }
 
-func (s *MemoryStorage) RetFullURL(key string) string {
-	return BaseURL[key]
+func (s *MemoryStorage) RetFullURL(key string) (string, error) {
+	return s.baseURL[key], nil
 }
 
-func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
-	if len(BaseURL) == 0 {
+func (s *MemoryStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
+	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
 	var AllURLs = make([]URLs, 0)
 	var mutex sync.Mutex
 	mutex.Lock()
-	for key, value := range BaseURL {
-		if UserURL[key] == UserID {
+	for key, value := range s.baseURL {
+		if s.userURL[key] == userID {
 			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
 		}
 	}
@@ -70,22 +69,21 @@ func (s *MemoryStorage) CheckPing(P *config.Param) error {
 	return errors.New("wrong DB used: memory storage")
 }
 
-func (s *MemoryStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param) (*[]MultiURL, error) {
-	r := make([]MultiURL, len(*m))
-	for i, v := range *m {
+func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param) ([]MultiURL, error) {
+	r := make([]MultiURL, len(m))
+	for i, v := range m {
 		Key := HashStr(v.OriginURL)
-		var mutex sync.RWMutex
-		mutex.Lock()
-		BaseURL[Key] = v.OriginURL
-		UserURL[Key] = UserID
-		mutex.Unlock()
+		s.Lock()
+		s.baseURL[Key] = v.OriginURL
+		s.userURL[Key] = userID
+		s.Unlock()
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(P.URL + "/" + Key)
 	}
 
-	return &r, nil
+	return r, nil
 }
 
 func (s *MemoryStorage) CloseDB() {
-	log.Println("closed")
+	log.Info().Msg("closed")
 }

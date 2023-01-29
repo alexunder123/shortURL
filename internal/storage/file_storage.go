@@ -3,52 +3,53 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"os"
 	"shortURL/internal/config"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type FileStorage struct {
-	StorageStruct
+	baseURL map[string]string
+	userURL map[string]string
+	sync.RWMutex
 }
 
 func NewFileStorager(P *config.Param) Storager {
-	ReadStorage(P)
-	return &FileStorage{
-		StorageStruct: StorageStruct{
-			UserID: "",
-			Key:    "",
-			Value:  "",
-		},
+	fs := FileStorage{
+		baseURL: make(map[string]string),
+		userURL: make(map[string]string),
 	}
+	ReadStorage(P, &fs)
+	return &fs
 }
 
 func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
-	s.Key = HashStr(fURL)
-	_, true := BaseURL[s.Key]
+	key := HashStr(fURL)
+	_, true := s.baseURL[key]
 	if true {
-		if UserURL[s.Key] == UserID {
-			return s.Key, ErrConflict
+		if s.userURL[key] == UserID {
+			return key, ErrConflict
 		}
 	}
 
 	var mutex sync.Mutex
 	mutex.Lock()
-	BaseURL[s.Key] = fURL
-	UserURL[s.Key] = UserID
+	s.baseURL[key] = fURL
+	s.userURL[key] = UserID
 	mutex.Unlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err)
 	}
 	defer file.Close()
-	file.WriteFile(s.Key, UserID, fURL)
-	return s.Key, nil
+	file.WriteFile(key, UserID, fURL)
+	return key, nil
 }
 
-func (s *FileStorage) RetFullURL(key string) string {
-	return BaseURL[key]
+func (s *FileStorage) RetFullURL(key string) (string, error) {
+	return s.baseURL[key], nil
 }
 
 type readerFile struct {
@@ -57,18 +58,17 @@ type readerFile struct {
 }
 
 func (s *FileStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
-	if len(BaseURL) == 0 {
+	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
 	var AllURLs = make([]URLs, 0)
-	var mutex sync.Mutex
-	mutex.Lock()
-	for key, value := range BaseURL {
-		if UserURL[key] == UserID {
+	s.Lock()
+	for key, value := range s.baseURL {
+		if s.userURL[key] == UserID {
 			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
 		}
 	}
-	mutex.Unlock()
+	s.Unlock()
 	if len(AllURLs) == 0 {
 		return nil, ErrNoContent
 	}
@@ -83,35 +83,35 @@ func (s *FileStorage) CheckPing(P *config.Param) error {
 	return errors.New("wrong DB used: file storage")
 }
 
-func (s *FileStorage) WriteMultiURL(m *[]MultiURL, UserID string, P *config.Param) (*[]MultiURL, error) {
-	r := make([]MultiURL, len(*m))
+func (s *FileStorage) WriteMultiURL(m []MultiURL, UserID string, P *config.Param) ([]MultiURL, error) {
+	r := make([]MultiURL, len(m))
 	file, err := NewWriterFile(P)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err)
 	}
 	defer file.Close()
-	for i, v := range *m {
-		Key := HashStr(v.OriginURL)
+	for i, v := range m {
+		key := HashStr(v.OriginURL)
 		var mutex sync.RWMutex
 		mutex.Lock()
-		BaseURL[Key] = v.OriginURL
-		UserURL[Key] = UserID
+		s.baseURL[key] = v.OriginURL
+		s.userURL[key] = UserID
 		mutex.Unlock()
-		file.WriteFile(s.Key, UserID, v.OriginURL)
+		file.WriteFile(key, UserID, v.OriginURL)
 		r[i].CorrID = v.CorrID
-		r[i].ShortURL = string(P.URL + "/" + Key)
+		r[i].ShortURL = string(P.URL + "/" + key)
 	}
 
-	return &r, nil
+	return r, nil
 }
 
-func ReadStorage(P *config.Param) {
+func ReadStorage(P *config.Param, fs *FileStorage) {
 	file, err := NewReaderFile(P)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err)
 	}
 	defer file.Close()
-	file.ReadFile()
+	file.ReadFile(fs)
 }
 
 func NewReaderFile(P *config.Param) (*readerFile, error) {
@@ -125,22 +125,22 @@ func NewReaderFile(P *config.Param) (*readerFile, error) {
 	}, nil
 }
 
-func (r *readerFile) ReadFile() {
+func (r *readerFile) ReadFile(fs *FileStorage) {
 	var fileBZ = make([]byte, 0)
 	_, err := r.file.Read(fileBZ)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err)
 		return
 	}
 	for r.decoder.More() {
 		var t StorageStruct
 		err := r.decoder.Decode(&t)
 		if err != nil {
-			log.Println(err)
+			log.Error().Err(err)
 			return
 		}
-		BaseURL[t.Key] = t.Value
-		UserURL[t.Key] = t.UserID
+		fs.baseURL[t.Key] = t.Value
+		fs.userURL[t.Key] = t.UserID
 	}
 }
 
@@ -168,7 +168,7 @@ func (w *writerFile) WriteFile(key, userID, value string) {
 	t := StorageStruct{UserID: userID, Key: key, Value: value}
 	err := w.encoder.Encode(&t)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err)
 	}
 }
 
@@ -177,5 +177,5 @@ func (w *writerFile) Close() error {
 }
 
 func (s *FileStorage) CloseDB() {
-	log.Println("file closed")
+	log.Info().Msg("file closed")
 }

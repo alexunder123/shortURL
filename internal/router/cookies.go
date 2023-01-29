@@ -5,113 +5,101 @@ import (
 	"crypto/aes"
 	"encoding/hex"
 	"errors"
-	"log"
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
-var (
-	baseID        = make([]string, 0)
-	name   nameID = "UserID"
-)
+const USER_ID nameID = "UserID"
 
 type nameID string
 
 type MyCookie struct {
-	c http.Cookie
+	cookie http.Cookie
 }
 
 func MidWareCookies(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var ID string
-		var C MyCookie
+		var id string
+		var myCookie MyCookie
 		for _, cookie := range r.Cookies() {
 			if cookie.Name == "shortener" {
-				C.c = *cookie
+				myCookie.cookie = *cookie
 				break
 			}
 		}
-		ID, err := C.CheckCookie()
+		id, err := myCookie.checkCookie()
 		if err != nil {
-			log.Println(err)
-			ID, err = C.GenerateCookie()
+			log.Error().Err(err)
+			id, err = myCookie.generateCookie()
 			if err != nil {
-				log.Println(err)
+				log.Error().Err(err)
 				next.ServeHTTP(w, r)
 				return
 			}
-			http.SetCookie(w, &C.c)
+			http.SetCookie(w, &myCookie.cookie)
 		}
-		ctx := context.WithValue(r.Context(), name, ID)
+		ctx := context.WithValue(r.Context(), USER_ID, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func (c *MyCookie) GenerateCookie() (string, error) {
+func (c *MyCookie) generateCookie() (string, error) {
 	key := []byte("myShortenerURL00")
-	ID := RandomID(16)
+	id := randomID(16)
 	aesblock, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
 
 	dst := make([]byte, aes.BlockSize)
-	aesblock.Encrypt(dst, ID)
-	c.c.Name = "shortener"
-	c.c.Value = hex.EncodeToString(dst)
-	c.c.Path = "/"
-	c.c.Expires = time.Now().Add(time.Hour)
-	baseID = append(baseID, string(ID))
-	return string(ID), nil
+	aesblock.Encrypt(dst, id)
+	c.cookie.Name = "shortener"
+	c.cookie.Value = hex.EncodeToString(dst)
+	c.cookie.Path = "/"
+	c.cookie.Expires = time.Now().Add(time.Hour)
+	return string(id), nil
 }
 
-func (c *MyCookie) CheckCookie() (string, error) {
+func (c *MyCookie) checkCookie() (string, error) {
 	//При проверке встроенной функцией выдает ошибку "invalid Cookie.Expires" в тесте fetch_urls
 	// err := c.Valid()
 	// if err != nil {
 	// 	return err
 	// }
 
-	if c.c.Name != "shortener" {
+	if c.cookie.Name != "shortener" {
 		return "", errors.New("invalid cookie name")
 	}
-	if c.c.Value == "" {
+	if c.cookie.Value == "" {
 		return "", errors.New("empty cookie value")
 	}
-	ID, err := c.ReturnID()
+	id, err := c.returnID()
 	if err != nil {
 		return "", err
 	}
-	err = FindID(ID)
-	return ID, err
+	// err = findID(id)
+	return id, nil
 }
 
-func (c *MyCookie) ReturnID() (string, error) {
+func (c *MyCookie) returnID() (string, error) {
 	key := []byte("myShortenerURL00")
 	aesblock, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
-	ID := make([]byte, 16)
-	val, err := hex.DecodeString(c.c.Value)
+	id := make([]byte, 16)
+	val, err := hex.DecodeString(c.cookie.Value)
 	if err != nil {
 		return "", errors.New("cannot decode cookie")
 	}
-	aesblock.Decrypt(ID, val)
-	return string(ID), nil
+	aesblock.Decrypt(id, val)
+	return string(id), nil
 }
 
-func FindID(ID string) error {
-	for _, value := range baseID {
-		if ID == value {
-			return nil
-		}
-	}
-	return errors.New("invalid ID")
-}
-
-func RandomID(n int) []byte {
+func randomID(n int) []byte {
 	const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	bts := make([]byte, n)
 	rand.Seed(time.Now().UnixNano())

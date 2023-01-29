@@ -3,14 +3,18 @@ package router
 import (
 	"shortURL/internal/config"
 	"shortURL/internal/storage"
-
-	"github.com/go-chi/chi/v5"
 )
 
 type Router struct {
-	Router *chi.Mux
-	P      *config.Param
-	S      storage.Storager
+	Prm *config.Param
+	Str storage.Storager
+}
+
+func NewRouter(P *config.Param, S storage.Storager) *Router {
+	return &Router{
+		Prm: P,
+		Str: S,
+	}
 }
 
 type PostURL struct {
