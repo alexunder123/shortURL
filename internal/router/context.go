@@ -7,7 +7,7 @@ import (
 
 func ReadContextID(r *http.Request) string {
 	context := r.Context()
-	id := context.Value(USER_ID)
+	id := context.Value(userID)
 	if id == nil {
 		return ""
 	}

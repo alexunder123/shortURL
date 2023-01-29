@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const USER_ID nameID = "UserID"
+const userID nameID = "UserID"
 
 type nameID string
 
@@ -41,7 +41,7 @@ func MidWareCookies(next http.Handler) http.Handler {
 			}
 			http.SetCookie(w, &myCookie.cookie)
 		}
-		ctx := context.WithValue(r.Context(), USER_ID, id)
+		ctx := context.WithValue(r.Context(), userID, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
