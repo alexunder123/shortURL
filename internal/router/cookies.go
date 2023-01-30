@@ -99,6 +99,7 @@ func (c *MyCookie) returnID() (string, error) {
 	return string(id), nil
 }
 
+
 func randomID(n int) []byte {
 	const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	bts := make([]byte, n)

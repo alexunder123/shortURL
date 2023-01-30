@@ -178,7 +178,7 @@ func NewWriterFile(P *config.Param) (*writerFile, error) {
 }
 
 func (w *writerFile) WriteFile(key, userID, value string) {
-	t := StorageStruct{UserID: userID, Key: key, Value: value, Deleted: false}
+	t := StorageStruct{UserID: userID, Key: key, Value: value, Deleted: false, Deleted: false}
 	err := w.encoder.Encode(&t)
 	if err != nil {
 		log.Error().Err(err)
