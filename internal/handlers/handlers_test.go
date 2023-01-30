@@ -102,6 +102,9 @@ func TestRouter(t *testing.T) {
 		})
 	}
 	multiURL(ts, t)
+
+	DeletedURL(ts, t)
+
 	log.Println("Done")
 
 }
@@ -245,6 +248,9 @@ func multiURL(ts *httptest.Server, t *testing.T) {
 		}
 		log.Println("Done")
 	})
+}
+
+	func DeletedURL(ts *httptest.Server, t *testing.T){
 	t.Run("DeletedURL", func(t *testing.T) {
 		tests := []struct {
 			request []byte
@@ -335,4 +341,5 @@ func multiURL(ts *httptest.Server, t *testing.T) {
 			err = result.Body.Close()
 			require.NoError(t, err)
 		}
+	})
 }

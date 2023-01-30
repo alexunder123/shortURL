@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/caarlos0/env/v6"
 )
@@ -27,7 +27,7 @@ func NewConfig() *Param {
 
 	err := env.Parse(&params)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("NewConfig read envinronment error")
 	}
 	ReadFlags(&params)
 	if params.SQL != "" {

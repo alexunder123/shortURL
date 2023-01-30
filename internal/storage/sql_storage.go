@@ -23,7 +23,7 @@ func NewSQLStorager(P *config.Param) Storager {
 func (s *SQLStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
 	key := HashStr(fURL)
 
-	result, err := s.DB.Exec("INSERT INTO ShortURL_GO12Alex(key, user_id, value) VALUES($1, $2, $3) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", key, userID, fURL)
+	result, err := s.DB.Exec("INSERT INTO ShortURL_GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", key, userID, fURL)
 	if err != nil {
 		return "", err
 	}
@@ -117,7 +117,7 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param)
 	if err != nil {
 		return nil, err
 	}
-	stmt, err := tx.Prepare("INSERT INTO ShortURL_GO12Alex(key, user_id, value) VALUES($1, $2, $3)")
+	stmt, err := tx.Prepare("INSERT INTO ShortURL_GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false)")
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param)
 func OpenDB(P *config.Param) *sql.DB {
 	db, err := sql.Open("pgx", P.SQL)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("OpenDB open sql error")
 	}
 	CreateDB(db)
 	return db
@@ -152,32 +152,32 @@ func OpenDB(P *config.Param) *sql.DB {
 func CreateDB(db *sql.DB) {
 
 	// Использовать при необходимости изменения структуры таблицы
-	// _, err := db.Exec("DROP TABLE IF EXISTS ShortURL_GO12Alex;")
+	// _, err := db.Exec("ALTER TABLE GO12Alex DROP CONSTRAINT IF EXISTS unique_query;")
 	// if err != nil {
-	// 	log.Fatal(err)
+	// 	log.Fatal().Err(err).Msg("CreateDB drop constraint error")
 	// }
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS ShortURL_GO12Alex(key text, user_id text, value text, CONSTRAINT unique_query UNIQUE (user_id, value));")
+	// _, err = db.Exec("DROP TABLE IF EXISTS ShortURL_GO12Alex;")
+	// if err != nil {
+	// 	log.Fatal().Err(err).Msg("CreateDB drop table error")
+	// }
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS ShortURL_GO12Alex(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
-		log.Fatal(err)
-	}
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS GO12Alex(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
-	if err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("CreateDB create table error")
 	}
 }
 
 func (s *SQLStorage) CloseDB() {
 	err := s.DB.Close()
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("CloseDB DB closing err")
 	}
 	log.Info().Msg("db closed")
 }
 
-func (s *SQLStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+func (s *SQLStorage) MarkDeleted(deleteURLs []string, UserID string, P *config.Param) {
 	inputCh := make(chan string)
 	go func() {
-		for _, del := range *DeleteURLs {
+		for _, del := range deleteURLs {
 			inputCh <- del
 		}
 		close(inputCh)
@@ -197,15 +197,15 @@ func (s *SQLStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.
 	outCh := fanIn(workerChs)
 
 	//update
-	stmt, err := s.DB.Prepare("UPDATE GO12Alex SET deleted=true WHERE key=$1 AND user_id=$2")
+	stmt, err := s.DB.Prepare("UPDATE ShortURL_GO12Alex SET deleted=true WHERE key=$1 AND user_id=$2")
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err)
 		return
 	}
 	defer stmt.Close()
 	for key := range outCh {
 		if _, err = stmt.Exec(key, UserID); err != nil {
-			log.Println(err)
+			log.Error().Err(err).Msg("MarkDeleted DB update err")
 			return
 		}
 	}
@@ -213,7 +213,7 @@ func (s *SQLStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.
 
 func (s *SQLStorage) newWorker(in, out chan string, UserID string) {
 	go func() {
-		stmt, err := s.DB.Prepare("SELECT value FROM GO12Alex WHERE key = $1 AND user_id = $2")
+		stmt, err := s.DB.Prepare("SELECT value FROM ShortURL_GO12Alex WHERE key = $1 AND user_id = $2")
 		if err != nil {
 			return
 		}
@@ -222,7 +222,7 @@ func (s *SQLStorage) newWorker(in, out chan string, UserID string) {
 			key := strings.Trim(myURL, "\"")
 			row := stmt.QueryRow(key, UserID)
 			if err := row.Err(); err != nil {
-				log.Println(err)
+				log.Error().Err(err).Msg("newWorker QueryRow err")
 				return
 			}
 			out <- key

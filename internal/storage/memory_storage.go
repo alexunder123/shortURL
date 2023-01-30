@@ -13,6 +13,7 @@ import (
 type MemoryStorage struct {
 	baseURL map[string]string
 	userURL map[string]string
+	deletedURL map[string]bool
 	sync.RWMutex
 }
 
@@ -20,6 +21,7 @@ func NewMemoryStorager() Storager {
 	return &MemoryStorage{
 		baseURL: make(map[string]string),
 		userURL: make(map[string]string),
+		deletedURL: make(map[string]bool),
 	}
 }
 
@@ -32,14 +34,14 @@ func (s *MemoryStorage) SetShortURL(fURL, userID string, Params *config.Param) (
 		}
 	}
 
-	BaseURL[key] = fURL
-	UserURL[key] = UserID
+	s.baseURL[key] = fURL
+	s.userURL[key] = userID
 	return key, nil
 }
 
-func (s *MemoryStorage) RetFullURL(key string) string {
+func (s *MemoryStorage) RetFullURL(key string) (string, error) {
 	s.RLock()
-	del := s.DeletedURL[key]
+	del := s.deletedURL[key]
 	s.RUnlock()
 	if del {
 		return "", ErrGone
@@ -47,23 +49,20 @@ func (s *MemoryStorage) RetFullURL(key string) string {
 	return s.baseURL[key], nil
 }
 
-func (s *MemoryStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
-	if len(BaseURL) == 0 {
+func (s *MemoryStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
+	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
-	var AllURLs = make([]URLs, 0)
-	var mutex sync.Mutex
-	mutex.Lock()
+	var allURLs = make([]URLs, 0)
 	for key, value := range s.baseURL {
 		if s.userURL[key] == userID {
-			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
+			allURLs = append(allURLs, URLs{P.URL + "/" + key, value})
 		}
 	}
-	Mutex.Unlock()
-	if len(AllURLs) == 0 {
+	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(AllURLs)
+	sb, err := json.Marshal(allURLs)
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +92,10 @@ func (s *MemoryStorage) CloseDB() {
 	log.Info().Msg("closed")
 }
 
-func (s *MemoryStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+func (s *MemoryStorage) MarkDeleted(deleteURLs []string, userID string, P *config.Param) {
 	inputCh := make(chan string)
 	go func() {
-		for _, del := range *DeleteURLs {
+		for _, del := range deleteURLs {
 			inputCh <- del
 		}
 		close(inputCh)
@@ -108,7 +107,7 @@ func (s *MemoryStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *conf
 	workerChs := make([]chan string, 0, chQ)
 	for _, fanOutCh := range fanOutChs {
 		workerCh := make(chan string)
-		s.newWorker(fanOutCh, workerCh, UserID)
+		s.newWorker(fanOutCh, workerCh, userID)
 		workerChs = append(workerChs, workerCh)
 	}
 
@@ -116,23 +115,22 @@ func (s *MemoryStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *conf
 	outCh := fanIn(workerChs)
 
 	//update
-	var mutex sync.Mutex
-	mutex.Lock()
+	s.Lock()
 	for key := range outCh {
-		DeletedURL[key] = true
+		s.deletedURL[key] = true
 	}
-	mutex.Unlock()
+	s.Unlock()
 }
 
-func (s *MemoryStorage) newWorker(in, out chan string, UserID string) {
+func (s *MemoryStorage) newWorker(in, out chan string, userID string) {
 	go func() {
 		for myURL := range in {
 			key := strings.Trim(myURL, "\"")
 			var mutex sync.RWMutex
 			mutex.Lock()
-			id := UserURL[s.Key]
+			id := s.userURL[key]
 			mutex.Unlock()
-			if id != UserID {
+			if id != userID {
 				continue
 			}
 			out <- key

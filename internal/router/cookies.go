@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math/rand"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -33,10 +32,10 @@ func MidWareCookies(next http.Handler) http.Handler {
 		}
 		id, err := myCookie.checkCookie()
 		if err != nil {
-			log.Error().Err(err)
+			log.Error().Err(err).Msg("MidWareCookies checkCookie err")
 			id, err = myCookie.generateCookie()
 			if err != nil {
-				log.Error().Err(err)
+				log.Error().Err(err).Msg("MidWareCookies generateCookie err")
 				next.ServeHTTP(w, r)
 				return
 			}

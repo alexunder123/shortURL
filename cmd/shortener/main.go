@@ -36,7 +36,7 @@ func main() {
 			}
 		}
 	}()
-	log.Fatal().Err(http.ListenAndServe(params.Server, h))
+	log.Fatal().Msgf("server failed: %s", http.ListenAndServe(params.Server, h))
 }
 
 func setup() {

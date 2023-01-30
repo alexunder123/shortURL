@@ -12,52 +12,53 @@ import (
 )
 
 type FileStorage struct {
-	baseURL map[string]string
-	userURL map[string]string
+	baseURL    map[string]string
+	userURL    map[string]string
+	deletedURL map[string]bool
 	sync.RWMutex
 }
 
 func NewFileStorager(P *config.Param) Storager {
 	fs := FileStorage{
-		baseURL: make(map[string]string),
-		userURL: make(map[string]string),
+		baseURL:    make(map[string]string),
+		userURL:    make(map[string]string),
+		deletedURL: make(map[string]bool),
 	}
 	ReadStorage(P, &fs)
 	return &fs
 }
 
-func (s *FileStorage) SetShortURL(fURL, UserID string, Params *config.Param) (string, error) {
+func (s *FileStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
 	key := HashStr(fURL)
 	_, true := s.baseURL[key]
 	if true {
-		if s.userURL[key] == UserID {
+		if s.userURL[key] == userID {
 			return key, ErrConflict
 		}
 	}
 
-	var mutex sync.Mutex
 	s.RLock()
 	s.baseURL[key] = fURL
-	s.userURL[key] = UserID
+	s.userURL[key] = userID
 	s.deletedURL[key] = false
-	mutex.Unlock()
+	s.RUnlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("SetShortURL NewWriterFile err")
 	}
 	defer file.Close()
-	file.WriteFile(key, UserID, fURL)
+	file.WriteFile(key, userID, fURL)
 	return key, nil
 }
 
-func (s *FileStorage) RetFullURL(key string) string {
+func (s *FileStorage) RetFullURL(key string) (string, error) {
 	s.RLock()
 	del := s.deletedURL[key]
 	s.RUnlock()
 	if del {
 		return "", ErrGone
 	}
-	
+
 	return s.baseURL[key], nil
 }
 
@@ -66,22 +67,22 @@ type readerFile struct {
 	decoder *json.Decoder
 }
 
-func (s *FileStorage) ReturnAllURLs(UserID string, P *config.Param) ([]byte, error) {
+func (s *FileStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
-	var AllURLs = make([]URLs, 0)
+	var allURLs = make([]URLs, 0)
 	s.Lock()
 	for key, value := range s.baseURL {
-		if s.userURL[key] == UserID {
-			AllURLs = append(AllURLs, URLs{P.URL + "/" + key, value})
+		if s.userURL[key] == userID {
+			allURLs = append(allURLs, URLs{P.URL + "/" + key, value})
 		}
 	}
 	s.Unlock()
-	if len(AllURLs) == 0 {
+	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(AllURLs)
+	sb, err := json.Marshal(allURLs)
 	if err != nil {
 		return nil, err
 	}
@@ -92,22 +93,21 @@ func (s *FileStorage) CheckPing(P *config.Param) error {
 	return errors.New("wrong DB used: file storage")
 }
 
-func (s *FileStorage) WriteMultiURL(m []MultiURL, UserID string, P *config.Param) ([]MultiURL, error) {
+func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
 	file, err := NewWriterFile(P)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("WriteMultiURL NewWriterFile err")
 	}
 	defer file.Close()
 	for i, v := range m {
 		key := HashStr(v.OriginURL)
-		var mutex sync.RWMutex
-		mutex.Lock()
-		BaseURL[Key] = v.OriginURL
-		UserURL[Key] = UserID
-		DeletedURL[s.Key] = false
-		mutex.Unlock()
-		file.WriteFile(key, UserID, v.OriginURL)
+		s.Lock()
+		s.baseURL[key] = v.OriginURL
+		s.userURL[key] = userID
+		s.deletedURL[key] = false
+		s.Unlock()
+		file.WriteFile(key, userID, v.OriginURL)
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(P.URL + "/" + key)
 	}
@@ -118,7 +118,7 @@ func (s *FileStorage) WriteMultiURL(m []MultiURL, UserID string, P *config.Param
 func ReadStorage(P *config.Param, fs *FileStorage) {
 	file, err := NewReaderFile(P)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("ReadStorage NewWriterFile err")
 	}
 	defer file.Close()
 	file.ReadFile(fs)
@@ -139,21 +139,21 @@ func (r *readerFile) ReadFile(fs *FileStorage) {
 	var fileBZ = make([]byte, 0)
 	_, err := r.file.Read(fileBZ)
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("ReadFile reading file err")
 		return
 	}
 	for r.decoder.More() {
 		var t StorageStruct
 		err := r.decoder.Decode(&t)
 		if err != nil {
-			log.Error().Err(err)
+			log.Error().Err(err).Msg("ReadFile decoder err")
 			return
 		}
-		Mutex.Lock()
-		BaseURL[t.Key] = t.Value
-		UserURL[t.Key] = t.UserID
-		DeletedURL[t.Key] = t.Deleted
-		Mutex.Unlock()
+		fs.Lock()
+		fs.baseURL[t.Key] = t.Value
+		fs.userURL[t.Key] = t.UserID
+		fs.deletedURL[t.Key] = t.Deleted
+		fs.Unlock()
 	}
 }
 
@@ -193,10 +193,10 @@ func (s *FileStorage) CloseDB() {
 	log.Info().Msg("file closed")
 }
 
-func (s *FileStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param) {
+func (s *FileStorage) MarkDeleted(deleteURLs []string, UserID string, P *config.Param) {
 	inputCh := make(chan string)
 	go func() {
-		for _, del := range *DeleteURLs {
+		for _, del := range deleteURLs {
 			inputCh <- del
 		}
 		close(inputCh)
@@ -217,7 +217,7 @@ func (s *FileStorage) MarkDeleted(DeleteURLs *[]string, UserID string, P *config
 
 	//update
 	for key := range outCh {
-		DeletedURL[key] = true
+		s.deletedURL[key] = true
 	}
 }
 
@@ -226,7 +226,7 @@ func (s *FileStorage) newWorker(in, out chan string, UserID string) {
 		for myURL := range in {
 			key := strings.Trim(myURL, "\"")
 			s.RLock()
-			id := UserURL[key]
+			id := s.userURL[key]
 			s.RUnlock()
 			if id != UserID {
 				continue

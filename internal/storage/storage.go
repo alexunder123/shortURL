@@ -14,7 +14,7 @@ type Storager interface {
 	ReturnAllURLs(UserID string, P *config.Param) ([]byte, error)
 	CheckPing(P *config.Param) error
 	CloseDB()
-	MarkDeleted(DeleteURLs *[]string, UserID string, P *config.Param)
+	MarkDeleted(DeleteURLs []string, UserID string, P *config.Param)
 }
 
 func NewStorage(P *config.Param) Storager {

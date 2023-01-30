@@ -36,7 +36,7 @@ func (m Router) IDGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "URL Deleted", http.StatusGone)
 	}
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("IDGet storage error")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -49,7 +49,7 @@ func (m Router) IDGet(w http.ResponseWriter, r *http.Request) {
 func (m Router) PingGet(w http.ResponseWriter, r *http.Request) {
 	err := m.Str.CheckPing(m.Prm)
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("PingGet DB error")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
