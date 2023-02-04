@@ -30,7 +30,7 @@ func (m Router) BatchPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(multiURLs) == 0 {
-		http.Error(w, err.Error(), http.StatusNoContent)
+		http.Error(w, "batch URLs empty", http.StatusNoContent)
 		return
 	}
 	rMultiURLs, err := m.str.WriteMultiURL(multiURLs, userID, m.prm)
