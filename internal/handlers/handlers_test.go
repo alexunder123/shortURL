@@ -8,14 +8,15 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"shortURL/internal/config"
-	"shortURL/internal/router"
-	"shortURL/internal/storage"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"shortURL/internal/config"
+	"shortURL/internal/router"
+	"shortURL/internal/storage"
 )
 
 type urls struct {
@@ -34,6 +35,11 @@ type test struct {
 	name    string
 	request []byte
 	want    want
+}
+
+type postURLs struct {
+	GetURL string `json:"url,omitempty"`
+	SetURL string `json:"result,omitempty"`
 }
 
 func TestRouter(t *testing.T) {
@@ -118,7 +124,7 @@ func postURL(ts *httptest.Server, t *testing.T, tt test) (userResult []byte, c h
 		request1, err = http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
 		require.NoError(t, err)
 	case "application/json; charset=utf-8":
-		var req router.PostURL
+		var req postURLs
 		req.GetURL = string(tt.request)
 		reqBz, err := json.Marshal(req)
 		if err != nil {
@@ -162,7 +168,7 @@ func getURL(ts *httptest.Server, t *testing.T, tt test, userResult []byte) {
 		request2, err = http.NewRequest(http.MethodGet, string(userResult), nil)
 		require.NoError(t, err)
 	case "application/json; charset=utf-8":
-		var res router.PostURL
+		var res postURLs
 		err := json.Unmarshal(userResult, &res)
 		if err != nil {
 			panic(err)
@@ -203,9 +209,9 @@ func getUserURLs(ts *httptest.Server, t *testing.T, tt test, userResult []byte, 
 	var AllURLs = make([]urls, 0)
 	err = json.Unmarshal(userResult5, &AllURLs)
 	require.NoError(t, err)
-	for _, u := range AllURLs {
-		log.Println(u.OriginalURL, u.ShortURL)
-	}
+	// for _, u := range AllURLs {
+	// 	log.Println(u.OriginalURL, u.ShortURL)
+	// }
 }
 
 func multiURL(ts *httptest.Server, t *testing.T) {
@@ -243,103 +249,106 @@ func multiURL(ts *httptest.Server, t *testing.T) {
 		multis := make([]multiURL, 2)
 		err = json.Unmarshal(userResult1, &multis)
 		require.NoError(t, err)
-		for _, u := range multis {
-			log.Println(u.CorrID, u.ShortURL)
-		}
+		// for _, u := range multis {
+		// 	log.Println(u.CorrID, u.ShortURL)
+		// }
 	})
 
 }
 
-func DeletedURL(ts *httptest.Server, t *testing.T){
-t.Run("DeletedURL", func(t *testing.T) {
-	tests := []struct {
-		request []byte
-	}{
-		{
-			request: []byte(`/tapoueh.org/blog/2018/07/batch-updates-and-concurrency`),
-		},
-		{
-			request: []byte(`/pkg.go.dev/bytes`),
-		},
-		{
-			request: []byte(`/pkg.go.dev/strings`),
-		},
-		{
-			request: []byte(`/pkg.go.dev/database/sql`),
-		},
-		{
-			request: []byte(`https://practicum.yandex.ru/learn/go-advanced/courses`),
-		},
-		{
-			request: []byte(`/pkg.go.dev/net/url`),
-		},
-		{
-			request: []byte(`/pkg.go.dev/builtin`),
-		},
-		{
-			request: []byte(`/www.youtube.com`),
-		},
-	}
-	//GET cookie
-	request0, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
-	require.NoError(t, err)
-	result, err := http.DefaultClient.Do(request0)
-	require.NoError(t, err)
-	err = result.Body.Close()
-	require.NoError(t, err)
-	var c http.Cookie
-	for _, cookie := range result.Cookies() {
-		if cookie.Name == "shortener" {
-			c = *cookie
-			break
+func DeletedURL(ts *httptest.Server, t *testing.T) {
+	t.Run("DeletedURL", func(t *testing.T) {
+		tests := []struct {
+			request []byte
+		}{
+			{
+				request: []byte(`/tapoueh.org/blog/2018/07/batch-updates-and-concurrency`),
+			},
+			{
+				request: []byte(`/pkg.go.dev/bytes`),
+			},
+			{
+				request: []byte(`/pkg.go.dev/strings`),
+			},
+			{
+				request: []byte(`/pkg.go.dev/database/sql`),
+			},
+			{
+				request: []byte(`https://practicum.yandex.ru/learn/go-advanced/courses`),
+			},
+			{
+				request: []byte(`/pkg.go.dev/net/url`),
+			},
+			{
+				request: []byte(`/pkg.go.dev/builtin`),
+			},
+			{
+				request: []byte(`/www.youtube.com`),
+			},
 		}
-	}
-	//POST URLs with cookie
-	results := make([]string, 0, 8)
-
-	deletes := string(`[`)
-	for _, tt := range tests {
-		request1, err := http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
+		//GET cookie
+		request0, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
 		require.NoError(t, err)
-		request1.AddCookie(&c)
-		result, err := http.DefaultClient.Do(request1)
-		require.NoError(t, err)
-		assert.Equal(t, 201, result.StatusCode)
-		userResult, err := io.ReadAll(result.Body)
+		result, err := http.DefaultClient.Do(request0)
 		require.NoError(t, err)
 		err = result.Body.Close()
 		require.NoError(t, err)
-		results = append(results, string(userResult))
-		j := bytes.LastIndex(userResult, []byte(`/`))
-		if j == -1 {
-			continue
+		var c http.Cookie
+		for _, cookie := range result.Cookies() {
+			if cookie.Name == "shortener" {
+				c = *cookie
+				break
+			}
 		}
-		res := userResult[j+1:]
-		deletes = deletes + "\"" + string(res) + "\","
-	}
-	deletes = deletes + "]"
+		//POST URLs with cookie
+		results := make([]string, 0, 8)
 
-	// DELETE URLs
-	request2, err := http.NewRequest(http.MethodDelete, ts.URL+"/api/user/urls", bytes.NewReader([]byte(deletes)))
-	require.NoError(t, err)
-	request2.AddCookie(&c)
-	result, err = http.DefaultClient.Do(request2)
-	require.NoError(t, err)
-	assert.Equal(t, 202, result.StatusCode)
-	err = result.Body.Close()
-	require.NoError(t, err)
+		deletes := make([]string, 0, 8)
+		for _, tt := range tests {
+			request1, err := http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
+			require.NoError(t, err)
+			request1.AddCookie(&c)
+			result, err := http.DefaultClient.Do(request1)
+			require.NoError(t, err)
+			assert.Equal(t, 201, result.StatusCode)
+			userResult, err := io.ReadAll(result.Body)
+			require.NoError(t, err)
+			err = result.Body.Close()
+			require.NoError(t, err)
+			results = append(results, string(userResult))
+			j := bytes.LastIndex(userResult, []byte(`/`))
+			if j == -1 {
+				continue
+			}
+			res := userResult[j+1:]
+			deletes = append(deletes, string(res))
+		}
 
-	//GET deleted URLs
-	time.Sleep(100 * time.Millisecond)
-	for _, res := range results {
-		request3, err := http.NewRequest(http.MethodGet, res, nil)
+		deletesBZ, err := json.Marshal(deletes)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// DELETE URLs
+		request2, err := http.NewRequest(http.MethodDelete, ts.URL+"/api/user/urls", bytes.NewReader([]byte(deletesBZ)))
 		require.NoError(t, err)
-		request3.AddCookie(&c)
-		result, err := http.DefaultTransport.RoundTrip(request3)
+		request2.AddCookie(&c)
+		result, err = http.DefaultClient.Do(request2)
 		require.NoError(t, err)
-		assert.Equal(t, 410, result.StatusCode)
+		assert.Equal(t, 202, result.StatusCode)
 		err = result.Body.Close()
 		require.NoError(t, err)
-	}
-})
+
+		//GET deleted URLs
+		time.Sleep(300 * time.Millisecond)
+		for _, res := range results {
+			request3, err := http.NewRequest(http.MethodGet, res, nil)
+			require.NoError(t, err)
+			request3.AddCookie(&c)
+			result, err := http.DefaultTransport.RoundTrip(request3)
+			require.NoError(t, err)
+			assert.Equal(t, 410, result.StatusCode)
+			err = result.Body.Close()
+			require.NoError(t, err)
+		}
+	})
 }

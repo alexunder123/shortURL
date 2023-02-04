@@ -4,15 +4,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"shortURL/internal/config"
-	"shortURL/internal/handlers"
-	"shortURL/internal/router"
-	"shortURL/internal/storage"
 	"syscall"
 	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
+	"shortURL/internal/config"
+	"shortURL/internal/handlers"
+	"shortURL/internal/router"
+	"shortURL/internal/storage"
 )
 
 func main() {

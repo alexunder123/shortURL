@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"shortURL/internal/router"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"shortURL/internal/router"
 )
 
 

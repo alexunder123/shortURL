@@ -3,11 +3,12 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
-	"shortURL/internal/config"
-	"strings"
+	"errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog/log"
+
+	"shortURL/internal/config"
 )
 
 type SQLStorage struct {
@@ -16,21 +17,21 @@ type SQLStorage struct {
 
 func NewSQLStorager(P *config.Param) Storager {
 	return &SQLStorage{
-		DB: OpenDB(P),
+		DB: openDB(P),
 	}
 }
 
 func (s *SQLStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
-	key := HashStr(fURL)
+	key := hashStr(fURL)
 
-	result, err := s.DB.Exec("INSERT INTO ShortURL_GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", key, userID, fURL)
+	result, err := s.DB.Exec("INSERT INTO Short_URLs(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", key, userID, fURL)
 	if err != nil {
 		return "", err
 	}
 	changes, _ := result.RowsAffected()
 	if changes == 0 {
 		var oldkey string
-		row, err := s.DB.Query("SELECT key FROM ShortURL_GO12Alex WHERE user_id = $1 AND value = $2", userID, fURL)
+		row, err := s.DB.Query("SELECT key FROM Short_URLs WHERE user_id = $1 AND value = $2", userID, fURL)
 		if err != nil {
 			return "", err
 		}
@@ -54,30 +55,28 @@ func (s *SQLStorage) SetShortURL(fURL, userID string, Params *config.Param) (str
 func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	var value string
 	var deleted bool
-	row, err := s.DB.Query("SELECT value, deleted FROM ShortURL_GO12Alex WHERE key = $1", key)
+	row := s.DB.QueryRow("SELECT value, deleted FROM Short_URLs WHERE key = $1", key)
+	if errors.Is(row.Err(), sql.ErrNoRows) {
+		return "", ErrNoContent
+	}
+	if row.Err() != nil {
+		return "", row.Err()
+	}
+	err := row.Scan(&value, &deleted)
 	if err != nil {
 		return "", err
-	}
-	if err := row.Err(); err != nil {
-		return "", err
-	}
-	defer row.Close()
-	for row.Next() {
-		err = row.Scan(&value, &deleted)
-		if err != nil {
-			return "", err
-		}
 	}
 	if deleted {
 		return "", ErrGone
 	}
+
 	return value, nil
 }
 
 func (s *SQLStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
 
-	var allURLs = make([]URLs, 0)
-	rows, err := s.DB.Query("SELECT key, value FROM ShortURL_GO12Alex WHERE user_id = $1", userID)
+	var allURLs = make([]urls, 0)
+	rows, err := s.DB.Query("SELECT key, value FROM Short_URLs WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +85,7 @@ func (s *SQLStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, erro
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var nextURL URLs
+		var nextURL urls
 		var sURL string
 
 		err = rows.Scan(&sURL, &nextURL.OriginalURL)
@@ -107,8 +106,7 @@ func (s *SQLStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, erro
 }
 
 func (s *SQLStorage) CheckPing(P *config.Param) error {
-	err := s.DB.Ping()
-	return err
+	return s.DB.Ping()
 }
 
 func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param) ([]MultiURL, error) {
@@ -117,13 +115,13 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param)
 	if err != nil {
 		return nil, err
 	}
-	stmt, err := tx.Prepare("INSERT INTO ShortURL_GO12Alex(key, user_id, value, deleted) VALUES($1, $2, $3, false)")
+	stmt, err := tx.Prepare("INSERT INTO Short_URLs(key, user_id, value, deleted) VALUES($1, $2, $3, false)")
 	if err != nil {
 		return nil, err
 	}
 	defer stmt.Close()
 	for i, v := range m {
-		Key := HashStr(v.OriginURL)
+		Key := hashStr(v.OriginURL)
 		if _, err = stmt.Exec(Key, userID, v.OriginURL); err != nil {
 			if err = tx.Rollback(); err != nil {
 				log.Fatal().Msgf("update drivers: unable to rollback: %v", err)
@@ -140,27 +138,17 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param)
 	return r, nil
 }
 
-func OpenDB(P *config.Param) *sql.DB {
+func openDB(P *config.Param) *sql.DB {
 	db, err := sql.Open("pgx", P.SQL)
 	if err != nil {
 		log.Fatal().Err(err).Msg("OpenDB open sql error")
 	}
-	CreateDB(db)
+	createDB(db)
 	return db
 }
 
-func CreateDB(db *sql.DB) {
-
-	// Использовать при необходимости изменения структуры таблицы
-	// _, err := db.Exec("ALTER TABLE GO12Alex DROP CONSTRAINT IF EXISTS unique_query;")
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("CreateDB drop constraint error")
-	// }
-	// _, err = db.Exec("DROP TABLE IF EXISTS ShortURL_GO12Alex;")
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("CreateDB drop table error")
-	// }
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS ShortURL_GO12Alex(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
+func createDB(db *sql.DB) {
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS Short_URLs(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
 		log.Fatal().Err(err).Msg("CreateDB create table error")
 	}
@@ -174,59 +162,17 @@ func (s *SQLStorage) CloseDB() {
 	log.Info().Msg("db closed")
 }
 
-func (s *SQLStorage) MarkDeleted(deleteURLs []string, UserID string, P *config.Param) {
-	inputCh := make(chan string)
-	go func() {
-		for _, del := range deleteURLs {
-			inputCh <- del
-		}
-		close(inputCh)
-	}()
-
-	chQ := 5 //Количество каналов для работы
-	//fan out
-	fanOutChs := fanOut(inputCh, chQ)
-	workerChs := make([]chan string, 0, chQ)
-	for _, fanOutCh := range fanOutChs {
-		workerCh := make(chan string)
-		s.newWorker(fanOutCh, workerCh, UserID)
-		workerChs = append(workerChs, workerCh)
-	}
-
-	//fan in
-	outCh := fanIn(workerChs)
-
-	//update
-	stmt, err := s.DB.Prepare("UPDATE ShortURL_GO12Alex SET deleted=true WHERE key=$1 AND user_id=$2")
+func (s *SQLStorage) MarkDeleted(keys []string, id string) {
+	stmt, err := s.DB.Prepare("UPDATE Short_URLs SET deleted=true WHERE key=$1 AND user_id=$2")
 	if err != nil {
 		log.Error().Err(err)
 		return
 	}
 	defer stmt.Close()
-	for key := range outCh {
-		if _, err = stmt.Exec(key, UserID); err != nil {
+	for _, key := range keys {
+		if _, err = stmt.Exec(key, id); err != nil {
 			log.Error().Err(err).Msg("MarkDeleted DB update err")
 			return
 		}
 	}
-}
-
-func (s *SQLStorage) newWorker(in, out chan string, UserID string) {
-	go func() {
-		stmt, err := s.DB.Prepare("SELECT value FROM ShortURL_GO12Alex WHERE key = $1 AND user_id = $2")
-		if err != nil {
-			return
-		}
-		defer stmt.Close()
-		for myURL := range in {
-			key := strings.Trim(myURL, "\"")
-			row := stmt.QueryRow(key, UserID)
-			if err := row.Err(); err != nil {
-				log.Error().Err(err).Msg("newWorker QueryRow err")
-				return
-			}
-			out <- key
-		}
-		close(out)
-	}()
 }

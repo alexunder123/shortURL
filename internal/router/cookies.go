@@ -32,7 +32,7 @@ func MidWareCookies(next http.Handler) http.Handler {
 		}
 		id, err := myCookie.checkCookie()
 		if err != nil {
-			log.Error().Err(err).Msg("MidWareCookies checkCookie err")
+			log.Info().Err(err).Msg("MidWareCookies checkCookie err")
 			id, err = myCookie.generateCookie()
 			if err != nil {
 				log.Error().Err(err).Msg("MidWareCookies generateCookie err")
@@ -98,7 +98,6 @@ func (c *MyCookie) returnID() (string, error) {
 	aesblock.Decrypt(id, val)
 	return string(id), nil
 }
-
 
 func randomID(n int) []byte {
 	const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"

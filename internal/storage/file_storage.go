@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"shortURL/internal/config"
-	"strings"
 	"sync"
 
 	"github.com/rs/zerolog/log"
+
+	"shortURL/internal/config"
 )
 
 type FileStorage struct {
@@ -29,26 +29,25 @@ func NewFileStorager(P *config.Param) Storager {
 }
 
 func (s *FileStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
-	key := HashStr(fURL)
-	_, true := s.baseURL[key]
-	if true {
-		if s.userURL[key] == userID {
-			return key, ErrConflict
-		}
-	}
-
+	key := hashStr(fURL)
 	s.RLock()
+	id := s.userURL[key]
+	s.RUnlock()
+	if id == userID {
+		return "", ErrConflict
+	}
+	s.Lock()
 	s.baseURL[key] = fURL
 	s.userURL[key] = userID
 	s.deletedURL[key] = false
-	s.RUnlock()
+	s.Unlock()
 	file, err := NewWriterFile(Params)
 	if err != nil {
 		log.Fatal().Err(err).Msg("SetShortURL NewWriterFile err")
 	}
 	defer file.Close()
-	file.WriteFile(key, userID, fURL)
-	return key, nil
+	err = file.WriteFile(key, userID, fURL)
+	return key, err
 }
 
 func (s *FileStorage) RetFullURL(key string) (string, error) {
@@ -56,10 +55,15 @@ func (s *FileStorage) RetFullURL(key string) (string, error) {
 	del := s.deletedURL[key]
 	s.RUnlock()
 	if del {
-		return "", ErrGone
+		return key, ErrGone
 	}
-
-	return s.baseURL[key], nil
+	s.RLock()
+	fURL, ok := s.baseURL[key]
+	s.RUnlock()
+	if !ok {
+		return "", ErrNoContent
+	}
+	return fURL, nil
 }
 
 type readerFile struct {
@@ -71,14 +75,15 @@ func (s *FileStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, err
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
-	var allURLs = make([]URLs, 0)
-	s.Lock()
+	var allURLs = make([]urls, 0)
 	for key, value := range s.baseURL {
-		if s.userURL[key] == userID {
-			allURLs = append(allURLs, URLs{P.URL + "/" + key, value})
+		s.RLock()
+		id := s.userURL[key]
+		s.RUnlock()
+		if id == userID {
+			allURLs = append(allURLs, urls{P.URL + "/" + key, value})
 		}
 	}
-	s.Unlock()
 	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
@@ -101,13 +106,16 @@ func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param
 	}
 	defer file.Close()
 	for i, v := range m {
-		key := HashStr(v.OriginURL)
+		key := hashStr(v.OriginURL)
 		s.Lock()
 		s.baseURL[key] = v.OriginURL
 		s.userURL[key] = userID
 		s.deletedURL[key] = false
 		s.Unlock()
-		file.WriteFile(key, userID, v.OriginURL)
+		err := file.WriteFile(key, userID, v.OriginURL)
+		if err != nil {
+			return nil, err
+		}
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(P.URL + "/" + key)
 	}
@@ -143,7 +151,7 @@ func (r *readerFile) ReadFile(fs *FileStorage) {
 		return
 	}
 	for r.decoder.More() {
-		var t StorageStruct
+		var t storageStruct
 		err := r.decoder.Decode(&t)
 		if err != nil {
 			log.Error().Err(err).Msg("ReadFile decoder err")
@@ -177,12 +185,9 @@ func NewWriterFile(P *config.Param) (*writerFile, error) {
 	}, nil
 }
 
-func (w *writerFile) WriteFile(key, userID, value string) {
-	t := StorageStruct{UserID: userID, Key: key, Value: value, Deleted: false, Deleted: false}
-	err := w.encoder.Encode(&t)
-	if err != nil {
-		log.Error().Err(err)
-	}
+func (w *writerFile) WriteFile(key, userID, value string) error {
+	t := storageStruct{UserID: userID, Key: key, Value: value, Deleted: false}
+	return w.encoder.Encode(&t)
 }
 
 func (w *writerFile) Close() error {
@@ -193,46 +198,12 @@ func (s *FileStorage) CloseDB() {
 	log.Info().Msg("file closed")
 }
 
-func (s *FileStorage) MarkDeleted(deleteURLs []string, UserID string, P *config.Param) {
-	inputCh := make(chan string)
-	go func() {
-		for _, del := range deleteURLs {
-			inputCh <- del
+func (s *FileStorage) MarkDeleted(keys []string, id string) {
+	s.Lock()
+	for _, key := range keys {
+		if s.userURL[key] == id {
+			s.deletedURL[key] = true
 		}
-		close(inputCh)
-	}()
-
-	chQ := 5 //Количество каналов для работы
-	//fan out
-	fanOutChs := fanOut(inputCh, chQ)
-	workerChs := make([]chan string, 0, chQ)
-	for _, fanOutCh := range fanOutChs {
-		workerCh := make(chan string)
-		s.newWorker(fanOutCh, workerCh, UserID)
-		workerChs = append(workerChs, workerCh)
 	}
-
-	//fan in
-	outCh := fanIn(workerChs)
-
-	//update
-	for key := range outCh {
-		s.deletedURL[key] = true
-	}
-}
-
-func (s *FileStorage) newWorker(in, out chan string, UserID string) {
-	go func() {
-		for myURL := range in {
-			key := strings.Trim(myURL, "\"")
-			s.RLock()
-			id := s.userURL[key]
-			s.RUnlock()
-			if id != UserID {
-				continue
-			}
-			out <- key
-		}
-		close(out)
-	}()
+	s.Unlock()
 }

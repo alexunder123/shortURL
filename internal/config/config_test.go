@@ -18,7 +18,7 @@ func TestGetEnv(t *testing.T) {
 				URL:       "http://127.0.0.1:8080",
 				Storage:   "json_storage.json",
 				SQL:       "PostgreSQL:localhost",
-				SavePlace: 2,
+				SavePlace: SaveSQL,
 			},
 		},
 	}

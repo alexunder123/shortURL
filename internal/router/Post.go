@@ -2,12 +2,14 @@ package router
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
-	"shortURL/internal/storage"
 
 	"github.com/rs/zerolog/log"
+
+	"shortURL/internal/storage"
 )
 
 func (m Router) BatchPost(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +29,11 @@ func (m Router) BatchPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 		return
 	}
-	rMultiURLs, err := m.Str.WriteMultiURL(multiURLs, userID, m.Prm)
+	if len(multiURLs) == 0 {
+		http.Error(w, err.Error(), http.StatusNoContent)
+		return
+	}
+	rMultiURLs, err := m.str.WriteMultiURL(multiURLs, userID, m.prm)
 	if err != nil {
 		log.Error().Err(err).Msg("BatchPost WriteMultiURL err")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -50,7 +56,7 @@ func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
-	var addr PostURL
+	var addr postURL
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost read body err")
@@ -68,9 +74,9 @@ func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := m.Str.SetShortURL(addr.GetURL, userID, m.Prm)
-	if err == storage.ErrConflict {
-		newAddr := PostURL{SetURL: m.Prm.URL + "/" + key}
+	key, err := m.str.SetShortURL(addr.GetURL, userID, m.prm)
+	if errors.Is(err, storage.ErrConflict) {
+		newAddr := postURL{SetURL: m.prm.URL + "/" + key}
 		newAddrBZ, err := json.Marshal(newAddr)
 		if err != nil {
 			log.Error().Err(err).Msg("ShortenPost json.Marshal err")
@@ -82,7 +88,12 @@ func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
 		w.Write(newAddrBZ)
 		return
 	}
-	newAddr := PostURL{SetURL: m.Prm.URL + "/" + key}
+	if err != nil {
+		log.Error().Err(err).Msg("ShortenPost SetShortURL err")
+		http.Error(w, "Wrong address!", http.StatusInternalServerError)
+		return
+	}
+	newAddr := postURL{SetURL: m.prm.URL + "/" + key}
 	newAddrBZ, err := json.Marshal(newAddr)
 	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost json.Marshal err")
@@ -113,11 +124,11 @@ func (m Router) URLPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 		return
 	}
-	key, err := m.Str.SetShortURL(fURL, userID, m.Prm)
-	if err == storage.ErrConflict {
+	key, err := m.str.SetShortURL(fURL, userID, m.prm)
+	if errors.Is(err, storage.ErrConflict) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(m.Prm.URL + "/" + key))
+		w.Write([]byte(m.prm.URL + "/" + key))
 		return
 	}
 	if err != nil {
@@ -127,5 +138,5 @@ func (m Router) URLPost(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(m.Prm.URL + "/" + key))
+	w.Write([]byte(m.prm.URL + "/" + key))
 }

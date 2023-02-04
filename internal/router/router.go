@@ -6,18 +6,18 @@ import (
 )
 
 type Router struct {
-	Prm *config.Param
-	Str storage.Storager
+	prm     *config.Param
+	str     storage.Storager
 }
 
 func NewRouter(P *config.Param, S storage.Storager) *Router {
 	return &Router{
-		Prm: P,
-		Str: S,
+		prm:     P,
+		str:     S,
 	}
 }
 
-type PostURL struct {
+type postURL struct {
 	GetURL string `json:"url,omitempty"`
 	SetURL string `json:"result,omitempty"`
 }
