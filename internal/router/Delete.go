@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -22,8 +23,38 @@ func (m Router) URLsDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	userID := ReadContextID(r)
 	log.Debug().Msgf("Received URLs to delete: %s", deleteURLs)
-	go m.str.MarkDeleted(deleteURLs, userID)
+	if m.closed {
+		http.Error(w, "the server is in the process of stopping", http.StatusServiceUnavailable)
+		return
+	}
+	go m.writeToDelInput(deleteURLs, userID)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusAccepted)
 	w.Write(nil)
+}
+
+func (m Router) ProcessingDel(ctx context.Context) context.Context {
+	ctxStop, cancelStop := context.WithCancel(context.Background())
+	go func() {
+		//update
+		log.Debug().Msg("ProcessingDel started")
+		for toDel := range m.inputCh {
+			m.str.MarkDeleted(toDel.Keys, toDel.ID)
+		}
+		log.Info().Msg("output finished")
+		cancelStop()
+	}()
+
+	go func() {
+		<-ctx.Done()
+		m.closed = true
+		close(m.inputCh)
+		log.Info().Msg("inputCh closed")
+	}()
+
+	return ctxStop
+}
+
+func (m Router) writeToDelInput(deleteURLs []string, userID string) {
+	m.inputCh <- ToDelete{Keys: deleteURLs, ID: userID}
 }

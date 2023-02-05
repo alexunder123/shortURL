@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -47,7 +48,8 @@ func TestRouter(t *testing.T) {
 	storage := storage.NewStorage(params)
 	r := router.NewRouter(params, storage)
 	h := NewHandler(r)
-
+	ctx, cancel := context.WithCancel(context.Background())
+	_ = r.ProcessingDel(ctx)
 	l, err := net.Listen("tcp", params.Server)
 	if err != nil {
 		log.Fatal(err)
@@ -110,7 +112,7 @@ func TestRouter(t *testing.T) {
 	multiURL(ts, t)
 
 	DeletedURL(ts, t)
-
+	cancel()
 	log.Println("Done")
 
 }
