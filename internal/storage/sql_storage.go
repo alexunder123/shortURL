@@ -15,7 +15,13 @@ type SQLStorage struct {
 	DB *sql.DB
 }
 
-func NewSQLStorager(P *config.Param) Storager {
+func NewSQLStorager(cfg *config.Config) Storager {
+	db, err := sql.Ope("pgx", P.SQL)
+	if err != nil {
+		log.Fatal().Err(err).Msg("OpenDB open sql error")
+	}
+	createDB(db)
+	return db
 	return &SQLStorage{
 		DB: openDB(P),
 	}
@@ -136,15 +142,6 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param)
 		return nil, err
 	}
 	return r, nil
-}
-
-func openDB(P *config.Param) *sql.DB {
-	db, err := sql.Open("pgx", P.SQL)
-	if err != nil {
-		log.Fatal().Err(err).Msg("OpenDB open sql error")
-	}
-	createDB(db)
-	return db
 }
 
 func createDB(db *sql.DB) {

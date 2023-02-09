@@ -7,24 +7,24 @@ import (
 	"shortURL/internal/router"
 )
 
+// Router == Mux == Multiplexer
+func NewRouter(h *Handler) *chi.Mux {
+	r := chi.NewRouter()
 
-func NewHandler(r *router.Router) *chi.Mux {
-	h := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(router.MidWareDecompress)
+	r.Use(router.MidWareCookies)
 
-	h.Use(middleware.Logger)
-	h.Use(middleware.Recoverer)
-	h.Use(router.MidWareDecompress)
-	h.Use(router.MidWareCookies)
+	r.Post("/api/shorten/batch", h.BatchPost)
+	r.Post("/api/shorten", h.ShortenPost)
+	r.Post("/", r.URLPost)
 
-	h.Post("/api/shorten/batch", r.BatchPost)
-	h.Post("/api/shorten", r.ShortenPost)
-	h.Post("/", r.URLPost)
-	
-	h.Get("/api/user/urls", r.URLsGet)
-	h.Get("/{id}", r.IDGet)
-	h.Get("/ping", r.PingGet)
+	r.Get("/api/user/urls", h.URLsGet)
+	r.Get("/{id}", h.IDGet)
+	r.Get("/ping", h.PingGet)
 
-	h.Delete("/api/user/urls", r.URLsDelete)
+	r.Delete("/api/user/urls", h.URLsDelete)
 
-	return h
+	return r
 }

@@ -17,6 +17,7 @@ type Storager interface {
 	MarkDeleted([]string, string)
 }
 
+// Тип возвращаемого значения - интерфейс
 func NewStorage(P *config.Param) Storager {
 	switch P.SavePlace {
 	case config.SaveFile:

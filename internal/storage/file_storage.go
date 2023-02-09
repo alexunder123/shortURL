@@ -18,7 +18,7 @@ type FileStorage struct {
 	sync.RWMutex
 }
 
-func NewFileStorager(P *config.Param) Storager {
+func NewFileStorager(P *config.Param) *FileStorage {
 	fs := FileStorage{
 		baseURL:    make(map[string]string),
 		userURL:    make(map[string]string),

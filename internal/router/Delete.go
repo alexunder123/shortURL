@@ -9,13 +9,15 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (m Router) URLsDelete(w http.ResponseWriter, r *http.Request) {
+// Заменить на Handler
+func (r *Handler) URLsDelete(w http.ResponseWriter, r *http.Request) {
 	urlsBZ, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("URLsDelete read body error")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	var deleteURLs []string
 	if err = json.Unmarshal(urlsBZ, &deleteURLs); err != nil {
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
@@ -27,13 +29,19 @@ func (m Router) URLsDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "the server is in the process of stopping", http.StatusServiceUnavailable)
 		return
 	}
-	go m.writeToDelInput(deleteURLs, userID)
+
+	// FanIn (канал, который передаёт в воркер на удаление)
+	r.DelChan <- { userID, deleteURLs }
+
+	//go m.writeToDelInput(deleteURLs, userID)
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusAccepted)
 	w.Write(nil)
 }
 
-func (m Router) ProcessingDel(ctx context.Context) context.Context {
+// ! Отдельный пакет: воркер удаления, FanIn
+func (r Handler) ProcessingDel(ctx context.Context) context.Context {
 	ctxStop, cancelStop := context.WithCancel(context.Background())
 	go func() {
 		//update
