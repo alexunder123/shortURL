@@ -1,60 +1,53 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"shortURL/internal/config"
-	"shortURL/internal/handlers"
+	"shortURL/internal/handler"
+	"shortURL/internal/logger"
 	"shortURL/internal/router"
 	"shortURL/internal/storage"
+	"shortURL/internal/worker"
 )
 
 func main() {
-	setup()
+	logger.Newlogger()
 	log.Info().Msg("Start program")
-	params := config.NewConfig()
-	store := storage.NewStorage(params)
+	cnfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("NewConfig read environment error")
+	}
+	strg := storage.NewStorage(cnfg)
 	log.Debug().Msg("storage init")
-	r := router.NewRouter(params, store)
-	h := handlers.NewHandler(r)
+	deletingWorker := worker.NewWorker()
+	hndlr := handler.NewHandler(cnfg, strg, deletingWorker)
+	router := router.NewRouter(hndlr)
 	log.Debug().Msg("handler init")
+	deletingWorker.Run(strg, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
+	go func() {
+		err := http.ListenAndServe(cnfg.ServerAddress, router)
+		if err != nil {
+			log.Fatal().Msgf("server failed: %s", err)
+		}
+	}()
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	go func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		ctxStop := r.ProcessingDel(ctx)
-	loop:
-		for s := range sigChan {
-			switch s {
-			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				log.Info().Msg("Start exiting program")
-				break loop
-			}
+
+	for {
+		select {
+		case sig := <-sigChan:
+			log.Info().Msgf("OS cmd received signal %s", sig.String())
+			deletingWorker.Stop()
+			strg.CloseDB()
+			os.Exit(0)
+
 		}
-		cancel()
-		<-ctxStop.Done()
-		store.CloseDB()
-		os.Exit(0)
-
-	}()
-	log.Fatal().Msgf("server failed: %s", http.ListenAndServe(params.Server, h))
-}
-
-func setup() {
-
-	zerolog.TimeFieldFormat = ""
-
-	zerolog.TimestampFunc = func() time.Time {
-		return time.Date(2008, 1, 8, 17, 5, 05, 0, time.UTC)
 	}
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
+
 }

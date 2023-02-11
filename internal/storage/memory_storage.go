@@ -17,7 +17,7 @@ type MemoryStorage struct {
 	sync.RWMutex
 }
 
-func NewMemoryStorager() Storager {
+func NewMemoryStorager() *MemoryStorage {
 	return &MemoryStorage{
 		baseURL:    make(map[string]string),
 		userURL:    make(map[string]string),
@@ -25,7 +25,7 @@ func NewMemoryStorager() Storager {
 	}
 }
 
-func (s *MemoryStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
+func (s *MemoryStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 	s.RLock()
 	id := s.userURL[key]
@@ -57,7 +57,7 @@ func (s *MemoryStorage) RetFullURL(key string) (string, error) {
 	return fURL, nil
 }
 
-func (s *MemoryStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
+func (s *MemoryStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
@@ -67,7 +67,7 @@ func (s *MemoryStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, e
 		id := s.userURL[key]
 		s.RUnlock()
 		if id == userID {
-			allURLs = append(allURLs, urls{P.URL + "/" + key, value})
+			allURLs = append(allURLs, urls{cfg.BaseURL + "/" + key, value})
 		}
 	}
 	if len(allURLs) == 0 {
@@ -80,11 +80,11 @@ func (s *MemoryStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, e
 	return sb, nil
 }
 
-func (s *MemoryStorage) CheckPing(P *config.Param) error {
+func (s *MemoryStorage) CheckPing(cfg *config.Config) error {
 	return errors.New("wrong DB used: memory storage")
 }
 
-func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param) ([]MultiURL, error) {
+func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
 	for i, v := range m {
 		key := hashStr(v.OriginURL)
@@ -94,7 +94,7 @@ func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Par
 		s.deletedURL[key] = false
 		s.Unlock()
 		r[i].CorrID = v.CorrID
-		r[i].ShortURL = string(P.URL + "/" + key)
+		r[i].ShortURL = string(cfg.BaseURL + "/" + key)
 	}
 	return r, nil
 }
@@ -103,10 +103,10 @@ func (s *MemoryStorage) CloseDB() {
 	log.Info().Msg("closed")
 }
 
-func (s *MemoryStorage) MarkDeleted(keys []string, id string) {
+func (s *MemoryStorage) MarkDeleted(keys []string, ids []string) {
 	s.Lock()
-	for _, key := range keys {
-		if s.userURL[key] == id {
+	for i, key := range keys {
+		if s.userURL[key] == ids[i] {
 			s.deletedURL[key] = true
 		}
 	}

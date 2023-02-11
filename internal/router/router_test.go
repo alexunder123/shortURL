@@ -1,8 +1,7 @@
-package handlers
+package router
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"log"
@@ -16,8 +15,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"shortURL/internal/config"
-	"shortURL/internal/router"
+	"shortURL/internal/handler"
 	"shortURL/internal/storage"
+	"shortURL/internal/worker"
 )
 
 type urls struct {
@@ -44,18 +44,19 @@ type postURLs struct {
 }
 
 func TestRouter(t *testing.T) {
-	params := config.NewConfig()
-	storage := storage.NewStorage(params)
-	r := router.NewRouter(params, storage)
-	h := NewHandler(r)
-	ctx, cancel := context.WithCancel(context.Background())
-	_ = r.ProcessingDel(ctx)
-	l, err := net.Listen("tcp", params.Server)
+	cnfg, err := config.NewConfig()
+	require.NoError(t, err)
+	storage := storage.NewStorage(cnfg)
+	deletingWorker := worker.NewWorker()
+	handlers := handler.NewHandler(cnfg, storage, deletingWorker)
+	router := NewRouter(handlers)
+	deletingWorker.Run(storage, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
+	l, err := net.Listen("tcp", cnfg.ServerAddress)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ts := httptest.NewUnstartedServer(h)
+	ts := httptest.NewUnstartedServer(router)
 	ts.Listener.Close()
 	ts.Listener = l
 	ts.Start()
@@ -84,7 +85,7 @@ func TestRouter(t *testing.T) {
 			},
 		},
 	}
-	if params.SavePlace == config.SaveSQL {
+	if cnfg.SavePlace == config.SaveSQL {
 		t.Run("Ping", func(t *testing.T) {
 			request1, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
 			require.NoError(t, err)
@@ -112,7 +113,7 @@ func TestRouter(t *testing.T) {
 	multiURL(ts, t)
 
 	DeletedURL(ts, t)
-	cancel()
+	deletingWorker.Stop()
 	log.Println("Done")
 
 }

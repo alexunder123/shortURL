@@ -1,4 +1,4 @@
-package router
+package midware
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const userID nameID = "UserID"
+const UserID nameID = "UserID"
 
 type nameID string
 
@@ -20,7 +20,7 @@ type MyCookie struct {
 	cookie http.Cookie
 }
 
-func MidWareCookies(next http.Handler) http.Handler {
+func Cookies(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var id string
 		var myCookie MyCookie
@@ -41,7 +41,7 @@ func MidWareCookies(next http.Handler) http.Handler {
 			}
 			http.SetCookie(w, &myCookie.cookie)
 		}
-		ctx := context.WithValue(r.Context(), userID, id)
+		ctx := context.WithValue(r.Context(), UserID, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

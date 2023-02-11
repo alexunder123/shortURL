@@ -15,13 +15,21 @@ type SQLStorage struct {
 	DB *sql.DB
 }
 
-func NewSQLStorager(P *config.Param) Storager {
+func NewSQLStorager(cfg *config.Config) *SQLStorage {
+	db, err := sql.Open("pgx", cfg.DatabaseDSN)
+	if err != nil {
+		log.Fatal().Err(err).Msg("OpenDB open sql error")
+	}
+	err = createDB(db)
+	if err != nil {
+		log.Fatal().Err(err).Msg("CreateDB create table error")
+	}
 	return &SQLStorage{
-		DB: openDB(P),
+		DB: db,
 	}
 }
 
-func (s *SQLStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
+func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 
 	result, err := s.DB.Exec("INSERT INTO Short_URLs(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING", key, userID, fURL)
@@ -73,7 +81,7 @@ func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	return value, nil
 }
 
-func (s *SQLStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
+func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
 
 	var allURLs = make([]urls, 0)
 	rows, err := s.DB.Query("SELECT key, value FROM Short_URLs WHERE user_id = $1", userID)
@@ -92,7 +100,7 @@ func (s *SQLStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, erro
 		if err != nil {
 			return nil, err
 		}
-		nextURL.ShortURL = string(P.URL + "/" + sURL)
+		nextURL.ShortURL = string(cfg.BaseURL + "/" + sURL)
 		allURLs = append(allURLs, nextURL)
 	}
 	if len(allURLs) == 0 {
@@ -105,11 +113,11 @@ func (s *SQLStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, erro
 	return sb, nil
 }
 
-func (s *SQLStorage) CheckPing(P *config.Param) error {
+func (s *SQLStorage) CheckPing(cfg *config.Config) error {
 	return s.DB.Ping()
 }
 
-func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param) ([]MultiURL, error) {
+func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
 	tx, err := s.DB.Begin()
 	if err != nil {
@@ -129,7 +137,7 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param)
 			return nil, err
 		}
 		r[i].CorrID = v.CorrID
-		r[i].ShortURL = string(P.URL + "/" + Key)
+		r[i].ShortURL = string(cfg.BaseURL + "/" + Key)
 	}
 	if err := tx.Commit(); err != nil {
 		log.Fatal().Msgf("update drivers: unable to commit: %v", err)
@@ -138,20 +146,12 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param)
 	return r, nil
 }
 
-func openDB(P *config.Param) *sql.DB {
-	db, err := sql.Open("pgx", P.SQL)
-	if err != nil {
-		log.Fatal().Err(err).Msg("OpenDB open sql error")
-	}
-	createDB(db)
-	return db
-}
-
-func createDB(db *sql.DB) {
+func createDB(db *sql.DB) error {
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS Short_URLs(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {
-		log.Fatal().Err(err).Msg("CreateDB create table error")
+		return err
 	}
+	return nil
 }
 
 func (s *SQLStorage) CloseDB() {
@@ -162,15 +162,15 @@ func (s *SQLStorage) CloseDB() {
 	log.Info().Msg("db closed")
 }
 
-func (s *SQLStorage) MarkDeleted(keys []string, id string) {
+func (s *SQLStorage) MarkDeleted(keys []string, ids []string) {
 	stmt, err := s.DB.Prepare("UPDATE Short_URLs SET deleted=true WHERE key=$1 AND user_id=$2")
 	if err != nil {
 		log.Error().Err(err)
 		return
 	}
 	defer stmt.Close()
-	for _, key := range keys {
-		if _, err = stmt.Exec(key, id); err != nil {
+	for i, key := range keys {
+		if _, err = stmt.Exec(key, ids[i]); err != nil {
 			log.Error().Err(err).Msg("MarkDeleted DB update err")
 			return
 		}

@@ -18,17 +18,17 @@ type FileStorage struct {
 	sync.RWMutex
 }
 
-func NewFileStorager(P *config.Param) Storager {
+func NewFileStorager(cfg *config.Config) *FileStorage {
 	fs := FileStorage{
 		baseURL:    make(map[string]string),
 		userURL:    make(map[string]string),
 		deletedURL: make(map[string]bool),
 	}
-	ReadStorage(P, &fs)
+	ReadStorage(cfg, &fs)
 	return &fs
 }
 
-func (s *FileStorage) SetShortURL(fURL, userID string, Params *config.Param) (string, error) {
+func (s *FileStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 	s.RLock()
 	id := s.userURL[key]
@@ -41,7 +41,7 @@ func (s *FileStorage) SetShortURL(fURL, userID string, Params *config.Param) (st
 	s.userURL[key] = userID
 	s.deletedURL[key] = false
 	s.Unlock()
-	file, err := NewWriterFile(Params)
+	file, err := NewWriterFile(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("SetShortURL NewWriterFile err")
 	}
@@ -71,7 +71,7 @@ type readerFile struct {
 	decoder *json.Decoder
 }
 
-func (s *FileStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, error) {
+func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
@@ -81,7 +81,7 @@ func (s *FileStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, err
 		id := s.userURL[key]
 		s.RUnlock()
 		if id == userID {
-			allURLs = append(allURLs, urls{P.URL + "/" + key, value})
+			allURLs = append(allURLs, urls{cfg.BaseURL + "/" + key, value})
 		}
 	}
 	if len(allURLs) == 0 {
@@ -94,13 +94,13 @@ func (s *FileStorage) ReturnAllURLs(userID string, P *config.Param) ([]byte, err
 	return sb, nil
 }
 
-func (s *FileStorage) CheckPing(P *config.Param) error {
+func (s *FileStorage) CheckPing(P *config.Config) error {
 	return errors.New("wrong DB used: file storage")
 }
 
-func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param) ([]MultiURL, error) {
+func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
-	file, err := NewWriterFile(P)
+	file, err := NewWriterFile(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("WriteMultiURL NewWriterFile err")
 	}
@@ -117,14 +117,14 @@ func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, P *config.Param
 			return nil, err
 		}
 		r[i].CorrID = v.CorrID
-		r[i].ShortURL = string(P.URL + "/" + key)
+		r[i].ShortURL = string(cfg.BaseURL + "/" + key)
 	}
 
 	return r, nil
 }
 
-func ReadStorage(P *config.Param, fs *FileStorage) {
-	file, err := NewReaderFile(P)
+func ReadStorage(cfg *config.Config, fs *FileStorage) {
+	file, err := NewReaderFile(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("ReadStorage NewWriterFile err")
 	}
@@ -132,8 +132,8 @@ func ReadStorage(P *config.Param, fs *FileStorage) {
 	file.ReadFile(fs)
 }
 
-func NewReaderFile(P *config.Param) (*readerFile, error) {
-	file, err := os.OpenFile(P.Storage, os.O_RDONLY|os.O_CREATE, 0777)
+func NewReaderFile(cfg *config.Config) (*readerFile, error) {
+	file, err := os.OpenFile(cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +174,8 @@ type writerFile struct {
 	encoder *json.Encoder
 }
 
-func NewWriterFile(P *config.Param) (*writerFile, error) {
-	file, err := os.OpenFile(P.Storage, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
+func NewWriterFile(cfg *config.Config) (*writerFile, error) {
+	file, err := os.OpenFile(cfg.FileStoragePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -198,10 +198,10 @@ func (s *FileStorage) CloseDB() {
 	log.Info().Msg("file closed")
 }
 
-func (s *FileStorage) MarkDeleted(keys []string, id string) {
+func (s *FileStorage) MarkDeleted(keys []string, ids []string) {
 	s.Lock()
-	for _, key := range keys {
-		if s.userURL[key] == id {
+	for i, key := range keys {
+		if s.userURL[key] == ids[i] {
 			s.deletedURL[key] = true
 		}
 	}

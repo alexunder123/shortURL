@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"encoding/json"
@@ -9,12 +9,13 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"shortURL/internal/midware"
 	"shortURL/internal/storage"
 )
 
-func (m Router) BatchPost(w http.ResponseWriter, r *http.Request) {
-	userID := ReadContextID(r)
-	if userID == "" {
+func (h *Handler) BatchNewEtriesPost(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(midware.UserID).(string)
+	if !ok {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
@@ -33,7 +34,7 @@ func (m Router) BatchPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "batch URLs empty", http.StatusNoContent)
 		return
 	}
-	rMultiURLs, err := m.str.WriteMultiURL(multiURLs, userID, m.prm)
+	rMultiURLs, err := h.strg.WriteMultiURL(multiURLs, userID, h.cfg)
 	if err != nil {
 		log.Error().Err(err).Msg("BatchPost WriteMultiURL err")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -50,9 +51,9 @@ func (m Router) BatchPost(w http.ResponseWriter, r *http.Request) {
 	w.Write(rMultiURLsBZ)
 }
 
-func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
-	userID := ReadContextID(r)
-	if userID == "" {
+func (h *Handler) ShortenPost(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(midware.UserID).(string)
+	if !ok {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
@@ -74,9 +75,9 @@ func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := m.str.SetShortURL(addr.GetURL, userID, m.prm)
+	key, err := h.strg.SetShortURL(addr.GetURL, userID, h.cfg)
 	if errors.Is(err, storage.ErrConflict) {
-		newAddr := postURL{SetURL: m.prm.URL + "/" + key}
+		newAddr := postURL{SetURL: h.cfg.BaseURL + "/" + key}
 		newAddrBZ, err := json.Marshal(newAddr)
 		if err != nil {
 			log.Error().Err(err).Msg("ShortenPost json.Marshal err")
@@ -93,7 +94,7 @@ func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Wrong address!", http.StatusInternalServerError)
 		return
 	}
-	newAddr := postURL{SetURL: m.prm.URL + "/" + key}
+	newAddr := postURL{SetURL: h.cfg.BaseURL + "/" + key}
 	newAddrBZ, err := json.Marshal(newAddr)
 	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost json.Marshal err")
@@ -105,9 +106,9 @@ func (m Router) ShortenPost(w http.ResponseWriter, r *http.Request) {
 	w.Write(newAddrBZ)
 }
 
-func (m Router) URLPost(w http.ResponseWriter, r *http.Request) {
-	userID := ReadContextID(r)
-	if userID == "" {
+func (h *Handler) URLPost(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(midware.UserID).(string)
+	if !ok {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
@@ -124,11 +125,11 @@ func (m Router) URLPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 		return
 	}
-	key, err := m.str.SetShortURL(fURL, userID, m.prm)
+	key, err := h.strg.SetShortURL(fURL, userID, h.cfg)
 	if errors.Is(err, storage.ErrConflict) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(m.prm.URL + "/" + key))
+		w.Write([]byte(h.cfg.BaseURL + "/" + key))
 		return
 	}
 	if err != nil {
@@ -138,5 +139,5 @@ func (m Router) URLPost(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(m.prm.URL + "/" + key))
+	w.Write([]byte(h.cfg.BaseURL + "/" + key))
 }

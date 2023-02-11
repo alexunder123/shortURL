@@ -1,33 +1,30 @@
 package router
 
 import (
-	"shortURL/internal/config"
-	"shortURL/internal/storage"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"shortURL/internal/handler"
+	"shortURL/internal/midware"
 )
 
-type Router struct {
-	prm     *config.Param
-	str     storage.Storager
-	inputCh chan ToDelete
-	closed bool
-}
+func NewRouter(h *handler.Handler) *chi.Mux {
+	r := chi.NewRouter()
 
-func NewRouter(P *config.Param, S storage.Storager) *Router {
-	return &Router{
-		prm:     P,
-		str:     S,
-		inputCh: make(chan ToDelete),
-		closed: false,
-	}
-}
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(midware.Decompress)
+	r.Use(midware.Cookies)
 
-type postURL struct {
-	GetURL string `json:"url,omitempty"`
-	SetURL string `json:"result,omitempty"`
-}
+	r.Post("/api/shorten/batch", h.BatchNewEtriesPost)
+	r.Post("/api/shorten", h.ShortenPost)
+	r.Post("/", h.URLPost)
 
+	r.Get("/api/user/urls", h.URLsGet)
+	r.Get("/{id}", h.IDGet)
+	r.Get("/ping", h.PingGet)
 
-type ToDelete struct{
-	Keys []string
-	ID string
+	r.Delete("/api/user/urls", h.URLsDelete)
+
+	return r
 }

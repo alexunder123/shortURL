@@ -8,21 +8,21 @@ import (
 )
 
 type Storager interface {
-	SetShortURL(fURL, UserID string, Params *config.Param) (string, error)
-	WriteMultiURL(m []MultiURL, UserID string, P *config.Param) ([]MultiURL, error)
+	SetShortURL(fURL, UserID string, Params *config.Config) (string, error)
+	WriteMultiURL(m []MultiURL, UserID string, P *config.Config) ([]MultiURL, error)
 	RetFullURL(key string) (string, error)
-	ReturnAllURLs(UserID string, P *config.Param) ([]byte, error)
-	CheckPing(P *config.Param) error
+	ReturnAllURLs(UserID string, P *config.Config) ([]byte, error)
+	CheckPing(P *config.Config) error
 	CloseDB()
-	MarkDeleted([]string, string)
+	MarkDeleted([]string, []string)
 }
 
-func NewStorage(P *config.Param) Storager {
-	switch P.SavePlace {
+func NewStorage(cfg *config.Config) Storager {
+	switch cfg.SavePlace {
 	case config.SaveFile:
-		return NewFileStorager(P)
+		return NewFileStorager(cfg)
 	case config.SaveSQL:
-		return NewSQLStorager(P)
+		return NewSQLStorager(cfg)
 	default:
 		return NewMemoryStorager()
 	}

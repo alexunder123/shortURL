@@ -1,4 +1,4 @@
-package router
+package handler
 
 import (
 	"errors"
@@ -7,16 +7,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 
+	"shortURL/internal/midware"
 	"shortURL/internal/storage"
 )
 
-func (m Router) URLsGet(w http.ResponseWriter, r *http.Request) {
-	userID := ReadContextID(r)
-	if userID == "" {
+func (h *Handler) URLsGet(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(midware.UserID).(string)
+	if !ok {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
-	urlsBZ, err := m.str.ReturnAllURLs(userID, m.prm)
+	urlsBZ, err := h.strg.ReturnAllURLs(userID, h.cfg)
 	if errors.Is(err, storage.ErrNoContent) {
 		http.Error(w, err.Error(), http.StatusNoContent)
 		return
@@ -31,9 +32,9 @@ func (m Router) URLsGet(w http.ResponseWriter, r *http.Request) {
 	w.Write(urlsBZ)
 }
 
-func (m Router) IDGet(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) IDGet(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "id")
-	address, err := m.str.RetFullURL(key)
+	address, err := h.strg.RetFullURL(key)
 	if errors.Is(err, storage.ErrGone) {
 		http.Error(w, "URL Deleted", http.StatusGone)
 		return
@@ -49,8 +50,8 @@ func (m Router) IDGet(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, address, http.StatusTemporaryRedirect)
 }
 
-func (m Router) PingGet(w http.ResponseWriter, r *http.Request) {
-	err := m.str.CheckPing(m.prm)
+func (h *Handler) PingGet(w http.ResponseWriter, r *http.Request) {
+	err := h.strg.CheckPing(h.cfg)
 	if err != nil {
 		log.Error().Err(err).Msg("PingGet DB error")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
