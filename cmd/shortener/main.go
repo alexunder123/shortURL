@@ -36,13 +36,16 @@ func main() {
 			log.Fatal().Msgf("server failed: %s", err)
 		}
 	}()
-	sigChan := make(chan os.Signal)
+
+	//требование statictest: "the channel used with signal.Notify should be buffered"
+	sigChan := make(chan os.Signal, 10)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	for {
-		select {
-		case sig := <-sigChan:
-			log.Info().Msgf("OS cmd received signal %s", sig.String())
+	//требование statictest: "should use for range instead of for { select {} }"
+	for sig := range sigChan {
+		switch sig {
+		case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
+			log.Info().Msgf("OS cmd received signal %s", sig)
 			deletingWorker.Stop()
 			strg.CloseDB()
 			os.Exit(0)

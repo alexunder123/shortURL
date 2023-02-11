@@ -4,6 +4,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -21,6 +22,8 @@ func TestGetEnv(t *testing.T) {
 				FileStoragePath: "json_storage.json",
 				DatabaseDSN:     "PostgreSQL:localhost",
 				SavePlace:       SaveSQL,
+				DeletingBufferSize: 10,
+				DeletingBufferTimeout: 100*time.Millisecond,
 			},
 		},
 	}
