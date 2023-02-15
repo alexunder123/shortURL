@@ -1,8 +1,7 @@
-package handlers
+package midware
 
 import (
 	"compress/gzip"
-
 	"io"
 	"net/http"
 	"strings"
