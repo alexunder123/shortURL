@@ -44,25 +44,25 @@ func BenchmarkRouter(b *testing.B) {
 	handlers := handler.NewHandler(cnfg, storage, deletingWorker)
 	router := NewRouter(handlers)
 	deletingWorker.Run(storage, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
-	l, err := net.Listen("tcp", cnfg.ServerAddress)
+	listener, err := net.Listen("tcp", cnfg.ServerAddress)
 	if err != nil {
 		log.Fatal().Err(err).Msg("net.Listen error")
 	}
 
-	ts := httptest.NewUnstartedServer(router)
-	ts.Listener.Close()
-	ts.Listener = l
-	ts.Start()
+	testServer := httptest.NewUnstartedServer(router)
+	testServer.Listener.Close()
+	testServer.Listener = listener
+	testServer.Start()
 
-	defer ts.Close()
+	defer testServer.Close()
 	const qTests = 50
 
-	var request *http.Request
-	var cookie http.Cookie
-	var userResult []byte
-
-	var res postURLs
-
+	var (
+		request    *http.Request
+		cookie     http.Cookie
+		userResult []byte
+		res        postURLs
+	)
 	multi := []multiURL{
 		{
 			CorrID:    "abc123",
@@ -110,10 +110,9 @@ func BenchmarkRouter(b *testing.B) {
 
 	b.ResetTimer()
 
-	// for {
 	b.Run("postURL text", func(b *testing.B) {
 		for i := 0; i < qTests; i++ {
-			request, err = http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader([]byte(`/github.com/Yandex-Practicum/go-autotests`)))
+			request, err = http.NewRequest(http.MethodPost, testServer.URL+"/", bytes.NewReader([]byte(`/github.com/Yandex-Practicum/go-autotests`)))
 			if err != nil {
 				log.Fatal().Err(err).Msg("http.NewRequest error")
 			}
@@ -165,7 +164,7 @@ func BenchmarkRouter(b *testing.B) {
 			log.Fatal().Err(err).Msg("json.Marshal error")
 		}
 		for i := 0; i < qTests; i++ {
-			request, err = http.NewRequest(http.MethodPost, ts.URL+"/api/shorten", bytes.NewReader(reqBz))
+			request, err = http.NewRequest(http.MethodPost, testServer.URL+"/api/shorten", bytes.NewReader(reqBz))
 			if err != nil {
 				log.Fatal().Err(err).Msg("http.NewRequest error")
 			}
@@ -215,7 +214,7 @@ func BenchmarkRouter(b *testing.B) {
 
 	b.Run("getUserURLs", func(b *testing.B) {
 		for i := 0; i < qTests; i++ {
-			request, err = http.NewRequest(http.MethodGet, ts.URL+"/api/user/urls", nil)
+			request, err = http.NewRequest(http.MethodGet, testServer.URL+"/api/user/urls", nil)
 			if err != nil {
 				log.Fatal().Err(err).Msg("http.NewRequest error")
 			}
@@ -237,7 +236,7 @@ func BenchmarkRouter(b *testing.B) {
 
 	b.Run("postBatchURLs", func(b *testing.B) {
 		for i := 0; i < qTests; i++ {
-			request, err = http.NewRequest(http.MethodPost, ts.URL+"/api/shorten/batch", bytes.NewReader(multiURLsBZ))
+			request, err = http.NewRequest(http.MethodPost, testServer.URL+"/api/shorten/batch", bytes.NewReader(multiURLsBZ))
 			if err != nil {
 				log.Fatal().Err(err).Msg("http.NewRequest error")
 			}
@@ -252,7 +251,7 @@ func BenchmarkRouter(b *testing.B) {
 	b.Run("postURLsToDelete", func(b *testing.B) {
 		for i := 0; i < qTests; i++ {
 			//GET cookie
-			request, err = http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
+			request, err = http.NewRequest(http.MethodGet, testServer.URL+"/ping", nil)
 			if err != nil {
 				log.Fatal().Err(err).Msg("http.NewRequest error")
 			}
@@ -274,7 +273,7 @@ func BenchmarkRouter(b *testing.B) {
 
 			deletes := make([]string, 0, 8)
 			for _, tt := range tests {
-				request, err = http.NewRequest(http.MethodPost, ts.URL+"/", bytes.NewReader(tt.request))
+				request, err = http.NewRequest(http.MethodPost, testServer.URL+"/", bytes.NewReader(tt.request))
 				if err != nil {
 					log.Fatal().Err(err).Msg("http.NewRequest error")
 				}
@@ -303,7 +302,7 @@ func BenchmarkRouter(b *testing.B) {
 				log.Fatal().Err(err).Msg("json.Marshal error")
 			}
 			// DELETE URLs
-			request, err = http.NewRequest(http.MethodDelete, ts.URL+"/api/user/urls", bytes.NewReader([]byte(deletesBZ)))
+			request, err = http.NewRequest(http.MethodDelete, testServer.URL+"/api/user/urls", bytes.NewReader([]byte(deletesBZ)))
 			if err != nil {
 				log.Fatal().Err(err).Msg("http.NewRequest error")
 			}
@@ -332,9 +331,6 @@ func BenchmarkRouter(b *testing.B) {
 			}
 		}
 	})
-
-	// }
-
 }
 
 func NewRouter(h *handler.Handler) *chi.Mux {
