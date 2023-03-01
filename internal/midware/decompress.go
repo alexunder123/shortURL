@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -30,6 +31,11 @@ func Decompress(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		} else if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			lenght, _ := strconv.Atoi(w.Header().Get("Content-Length"))
+			if lenght < 1400 { //1400 (1.4kB) минимальный объем данных, меньше которого нет смысла сжимать
+				next.ServeHTTP(w, r)
+				return
+			}
 			gz := gzip.NewWriter(w)
 			defer gz.Close()
 			w.Header().Set("Content-Encoding", "gzip")
