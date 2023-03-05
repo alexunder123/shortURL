@@ -1,3 +1,4 @@
+// Модуль опередляет и конфигурирует внешний пакет для логирования работы сервиса.
 package logger
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Newlogger конфигурирует формат и уровень отображения логов.
 func Newlogger() {
 	zerolog.TimeFieldFormat = ""
 

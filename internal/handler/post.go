@@ -13,6 +13,7 @@ import (
 	"shortURL/internal/storage"
 )
 
+// BatchNewEtriesPost метод принимает от пользователя и возвращает JSON список адресов на сокращение.
 func (h *Handler) BatchNewEtriesPost(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(midware.UserID).(string)
 	if !ok {
@@ -51,6 +52,7 @@ func (h *Handler) BatchNewEtriesPost(w http.ResponseWriter, r *http.Request) {
 	w.Write(rMultiURLsBZ)
 }
 
+// ShortenPost метод принимает от пользователя и возвращает в JSON адрес на сокращение.
 func (h *Handler) ShortenPost(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(midware.UserID).(string)
 	if !ok {
@@ -106,6 +108,7 @@ func (h *Handler) ShortenPost(w http.ResponseWriter, r *http.Request) {
 	w.Write(newAddrBZ)
 }
 
+// URLPost метод принимает от пользователя и возвращает адрес на сокращение.
 func (h *Handler) URLPost(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(midware.UserID).(string)
 	if !ok {

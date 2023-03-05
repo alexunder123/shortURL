@@ -12,14 +12,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const UserID nameID = "UserID"
-
 type nameID string
 
+// Константа для добавления контекста в запрос.
+// Предназначена для последующего считывания ID пользователя.
+const UserID nameID = "UserID"
+
+// MyCookie - структура для создания куки, и передачи ее пользователю.
 type MyCookie struct {
 	cookie http.Cookie
 }
 
+// Cookies middleware функция проверяет наличие и добавляет куки пользователя.
 func Cookies(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var id string
@@ -46,6 +50,7 @@ func Cookies(next http.Handler) http.Handler {
 	})
 }
 
+// generateCookie метод генерирует новые куки.
 func (c *MyCookie) generateCookie() (string, error) {
 	key := []byte("myShortenerURL00")
 	id := randomID(16)
@@ -63,13 +68,8 @@ func (c *MyCookie) generateCookie() (string, error) {
 	return string(id), nil
 }
 
+// checkCookie метод проверяет куки на корректность.
 func (c *MyCookie) checkCookie() (string, error) {
-	//При проверке встроенной функцией выдает ошибку "invalid Cookie.Expires" в тесте fetch_urls
-	// err := c.Valid()
-	// if err != nil {
-	// 	return err
-	// }
-
 	if c.cookie.Name != "shortener" {
 		return "", errors.New("invalid cookie name")
 	}
@@ -84,6 +84,7 @@ func (c *MyCookie) checkCookie() (string, error) {
 	return id, nil
 }
 
+// returnID метод возвращает новый ID пользователя.
 func (c *MyCookie) returnID() (string, error) {
 	key := []byte("myShortenerURL00")
 	aesblock, err := aes.NewCipher(key)
@@ -99,6 +100,7 @@ func (c *MyCookie) returnID() (string, error) {
 	return string(id), nil
 }
 
+// randomID функция генерирует новый ID пользователя.
 func randomID(n int) []byte {
 	const letterBytes = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	bts := make([]byte, n)

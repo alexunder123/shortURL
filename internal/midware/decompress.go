@@ -8,15 +8,18 @@ import (
 	"strings"
 )
 
+// gzipWriter добавляем обертку к интерфейсу, для замены штатного метода.
 type gzipWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
 }
 
+// Write добавляем свой метод.
 func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
 
+// Decompress middleware для сжатия и расшифровки передаваемых данных.
 func Decompress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Encoding") == "gzip" {

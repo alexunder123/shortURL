@@ -11,6 +11,7 @@ import (
 	"shortURL/internal/config"
 )
 
+// FileStorage структура для хранения оперативных данных базы данных.
 type FileStorage struct {
 	baseURL    map[string]string
 	userURL    map[string]string
@@ -18,16 +19,18 @@ type FileStorage struct {
 	sync.RWMutex
 }
 
+// NewFileStorager метод генерирует хранилище данных.
 func NewFileStorager(cfg *config.Config) *FileStorage {
 	fs := FileStorage{
 		baseURL:    make(map[string]string),
 		userURL:    make(map[string]string),
 		deletedURL: make(map[string]bool),
 	}
-	ReadStorage(cfg, &fs)
+	readStorage(cfg, &fs)
 	return &fs
 }
 
+// SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
 func (s *FileStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 	s.RLock()
@@ -41,15 +44,16 @@ func (s *FileStorage) SetShortURL(fURL, userID string, cfg *config.Config) (stri
 	s.userURL[key] = userID
 	s.deletedURL[key] = false
 	s.Unlock()
-	file, err := NewWriterFile(cfg)
+	file, err := newWriterFile(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("SetShortURL NewWriterFile err")
 	}
-	defer file.Close()
-	err = file.WriteFile(key, userID, fURL)
+	defer file.close()
+	err = file.writeFile(key, userID, fURL)
 	return key, err
 }
 
+// RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
 func (s *FileStorage) RetFullURL(key string) (string, error) {
 	s.RLock()
 	del := s.deletedURL[key]
@@ -66,11 +70,7 @@ func (s *FileStorage) RetFullURL(key string) (string, error) {
 	return fURL, nil
 }
 
-type readerFile struct {
-	file    *os.File
-	decoder *json.Decoder
-}
-
+// ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
 func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
@@ -94,17 +94,19 @@ func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, 
 	return sb, nil
 }
 
+// CheckPing метод возвращает статус подключения к базе данных.
 func (s *FileStorage) CheckPing(P *config.Config) error {
 	return errors.New("wrong DB used: file storage")
 }
 
+// WriteMultiURL метод обрабатывает, сохраняет и возвращает batch список сокращенных адресов.
 func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
-	file, err := NewWriterFile(cfg)
+	file, err := newWriterFile(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("WriteMultiURL NewWriterFile err")
 	}
-	defer file.Close()
+	defer file.close()
 	for i, v := range m {
 		key := hashStr(v.OriginURL)
 		s.Lock()
@@ -112,7 +114,7 @@ func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Con
 		s.userURL[key] = userID
 		s.deletedURL[key] = false
 		s.Unlock()
-		err := file.WriteFile(key, userID, v.OriginURL)
+		err := file.writeFile(key, userID, v.OriginURL)
 		if err != nil {
 			return nil, err
 		}
@@ -123,16 +125,37 @@ func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Con
 	return r, nil
 }
 
-func ReadStorage(cfg *config.Config, fs *FileStorage) {
-	file, err := NewReaderFile(cfg)
+// CloseDB метод закрывает соединение с хранилищем данных.
+func (s *FileStorage) CloseDB() {
+	log.Info().Msg("file closed")
+}
+
+// MarkDeleted метод помечает на удаление адреса пользователя в хранилище.
+func (s *FileStorage) MarkDeleted(keys []string, ids []string) {
+	s.Lock()
+	for i, key := range keys {
+		if s.userURL[key] == ids[i] {
+			s.deletedURL[key] = true
+		}
+	}
+	s.Unlock()
+}
+
+type readerFile struct {
+	file    *os.File
+	decoder *json.Decoder
+}
+
+func readStorage(cfg *config.Config, fs *FileStorage) {
+	file, err := newReaderFile(cfg)
 	if err != nil {
 		log.Fatal().Err(err).Msg("ReadStorage NewWriterFile err")
 	}
-	defer file.Close()
-	file.ReadFile(fs)
+	defer file.close()
+	file.readFile(fs)
 }
 
-func NewReaderFile(cfg *config.Config) (*readerFile, error) {
+func newReaderFile(cfg *config.Config) (*readerFile, error) {
 	file, err := os.OpenFile(cfg.FileStoragePath, os.O_RDONLY|os.O_CREATE, 0777)
 	if err != nil {
 		return nil, err
@@ -143,7 +166,7 @@ func NewReaderFile(cfg *config.Config) (*readerFile, error) {
 	}, nil
 }
 
-func (r *readerFile) ReadFile(fs *FileStorage) {
+func (r *readerFile) readFile(fs *FileStorage) {
 	var fileBZ = make([]byte, 0)
 	_, err := r.file.Read(fileBZ)
 	if err != nil {
@@ -165,7 +188,7 @@ func (r *readerFile) ReadFile(fs *FileStorage) {
 	}
 }
 
-func (r *readerFile) Close() error {
+func (r *readerFile) close() error {
 	return r.file.Close()
 }
 
@@ -174,7 +197,7 @@ type writerFile struct {
 	encoder *json.Encoder
 }
 
-func NewWriterFile(cfg *config.Config) (*writerFile, error) {
+func newWriterFile(cfg *config.Config) (*writerFile, error) {
 	file, err := os.OpenFile(cfg.FileStoragePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0777)
 	if err != nil {
 		return nil, err
@@ -185,25 +208,11 @@ func NewWriterFile(cfg *config.Config) (*writerFile, error) {
 	}, nil
 }
 
-func (w *writerFile) WriteFile(key, userID, value string) error {
+func (w *writerFile) writeFile(key, userID, value string) error {
 	t := storageStruct{UserID: userID, Key: key, Value: value, Deleted: false}
 	return w.encoder.Encode(&t)
 }
 
-func (w *writerFile) Close() error {
+func (w *writerFile) close() error {
 	return w.file.Close()
-}
-
-func (s *FileStorage) CloseDB() {
-	log.Info().Msg("file closed")
-}
-
-func (s *FileStorage) MarkDeleted(keys []string, ids []string) {
-	s.Lock()
-	for i, key := range keys {
-		if s.userURL[key] == ids[i] {
-			s.deletedURL[key] = true
-		}
-	}
-	s.Unlock()
 }

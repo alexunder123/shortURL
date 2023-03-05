@@ -11,6 +11,7 @@ import (
 	"shortURL/internal/worker"
 )
 
+// URLsDelete метод обрабатывает запрос на удаление записей сокращенных адресов.
 func (h *Handler) URLsDelete(w http.ResponseWriter, r *http.Request) {
 	urlsBZ, err := io.ReadAll(r.Body)
 	if err != nil {

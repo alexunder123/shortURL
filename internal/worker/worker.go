@@ -1,3 +1,5 @@
+// Модуль собирает данные на удаление адресов от хэндлеров.
+// Модуль передает в хранилище данные на удаление пакетами.
 package worker
 
 import (
@@ -8,17 +10,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// Worker - структура с каналами для обмена данными с хэндлерами.
 type Worker struct {
 	InputCh  chan ToDelete
 	finished chan struct{}
 	Closed   bool
 }
 
+// ToDelete - структура, задающая формат обмена данными с хэндлерами.
 type ToDelete struct {
 	Keys []string
 	ID   string
 }
 
+// NewWorker функция создает и возвращает ссылку на обработчик
 func NewWorker() *Worker {
 	worker := Worker{
 		InputCh:  make(chan ToDelete),
@@ -29,6 +34,7 @@ func NewWorker() *Worker {
 	return &worker
 }
 
+// Run метод запускает работу обработчика
 func (w *Worker) Run(strg storage.Storager, buffer int, delay time.Duration) {
 
 	go func() {
@@ -77,6 +83,7 @@ func (w *Worker) Run(strg storage.Storager, buffer int, delay time.Duration) {
 
 }
 
+// Stop метод останавливает работу обработчика
 func (w *Worker) Stop() {
 	w.Closed = true
 	close(w.InputCh)

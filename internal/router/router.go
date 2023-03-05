@@ -1,3 +1,4 @@
+// Модуль вызывает обработчик соответствующий параметрам API запроса.
 package router
 
 import (
@@ -8,6 +9,7 @@ import (
 	"shortURL/internal/midware"
 )
 
+// NewRouter функция генерирует мультиплексор для обработки API запросов.
 func NewRouter(h *handler.Handler) *chi.Mux {
 	r := chi.NewRouter()
 

@@ -212,9 +212,6 @@ func getUserURLs(ts *httptest.Server, t *testing.T, tt test, userResult []byte, 
 	var AllURLs = make([]urls, 0)
 	err = json.Unmarshal(userResult5, &AllURLs)
 	require.NoError(t, err)
-	// for _, u := range AllURLs {
-	// 	log.Println(u.OriginalURL, u.ShortURL)
-	// }
 }
 
 func multiURL(ts *httptest.Server, t *testing.T) {
@@ -252,9 +249,6 @@ func multiURL(ts *httptest.Server, t *testing.T) {
 		multis := make([]multiURL, 2)
 		err = json.Unmarshal(userResult1, &multis)
 		require.NoError(t, err)
-		// for _, u := range multis {
-		// 	log.Println(u.CorrID, u.ShortURL)
-		// }
 	})
 
 }
