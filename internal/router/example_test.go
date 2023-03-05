@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"time"
+	"os"
 
 	"shortURL/internal/config"
 	"shortURL/internal/handler"
@@ -17,19 +17,19 @@ import (
 
 func ExampleNewRouter() {
 
+	// Задаем адрес сервера
+	os.Setenv("SERVER_ADDRESS", "127.0.0.1:8888")
+	os.Setenv("BASE_URL", "http://127.0.0.1:8888")
+
 	// Подготовка роутера
-	var (
-		cfg config.Config = config.Config{
-			ServerAddress:         "127.0.0.1:8888",
-			BaseURL:               "http://127.0.0.1:8888",
-			SavePlace:             config.SaveMemory,
-			DeletingBufferSize:    10,
-			DeletingBufferTimeout: 100 * time.Millisecond,
-		}
-		strg  storage.Storager = storage.NewStorage(&cfg)
-		wrkr  *worker.Worker   = worker.NewWorker()
-		hndlr *handler.Handler = handler.NewHandler(&cfg, strg, wrkr)
-	)
+	cfg, err := config.NewConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	strg := storage.NewStorage(cfg)
+	wrkr := worker.NewWorker()
+	hndlr := handler.NewHandler(cfg, strg, wrkr)
+
 	router := NewRouter(hndlr)
 
 	// Запуск воркера
