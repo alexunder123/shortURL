@@ -1,3 +1,4 @@
+// Модуль считывает и хранит параметры конфигурации сервиса.
 package config
 
 import (
@@ -7,14 +8,17 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
+// SaveMethod - определяем тип данных для выбора места хранения данных в зависимости от полученных параметров.
 type SaveMethod int
 
+// Определяем константы для выбора хранилища данных.
 const (
 	SaveMemory SaveMethod = iota
 	SaveFile
 	SaveSQL
 )
 
+// Config хранит основные параметры конфигурации сервиса.
 type Config struct {
 	ServerAddress         string `env:"SERVER_ADDRESS"`
 	BaseURL               string `env:"BASE_URL"`
@@ -25,6 +29,7 @@ type Config struct {
 	DeletingBufferTimeout time.Duration
 }
 
+// NewConfig считывает основные параметры и генерирует структуру Config.
 func NewConfig() (*Config, error) {
 	var config Config
 

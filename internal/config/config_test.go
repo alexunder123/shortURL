@@ -17,13 +17,13 @@ func TestGetEnv(t *testing.T) {
 		{
 			name: "test1",
 			want: &Config{
-				ServerAddress:   "127.0.0.1:8080",
-				BaseURL:         "http://127.0.0.1:8080",
-				FileStoragePath: "json_storage.json",
-				DatabaseDSN:     "PostgreSQL:localhost",
-				SavePlace:       SaveSQL,
-				DeletingBufferSize: 10,
-				DeletingBufferTimeout: 100*time.Millisecond,
+				ServerAddress:         "127.0.0.1:8080",
+				BaseURL:               "http://127.0.0.1:8080",
+				FileStoragePath:       "json_storage.json",
+				DatabaseDSN:           "PostgreSQL:localhost",
+				SavePlace:             SaveSQL,
+				DeletingBufferSize:    10,
+				DeletingBufferTimeout: 100 * time.Millisecond,
 			},
 		},
 	}

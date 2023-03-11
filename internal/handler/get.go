@@ -11,6 +11,7 @@ import (
 	"shortURL/internal/storage"
 )
 
+// URLsGet метод возвращает пользователю список сокращенных им адресов.
 func (h *Handler) URLsGet(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(midware.UserID).(string)
 	if !ok {
@@ -32,6 +33,7 @@ func (h *Handler) URLsGet(w http.ResponseWriter, r *http.Request) {
 	w.Write(urlsBZ)
 }
 
+// IDGet метод возвращает пользователю исходный адрес.
 func (h *Handler) IDGet(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "id")
 	address, err := h.strg.RetFullURL(key)
@@ -50,6 +52,7 @@ func (h *Handler) IDGet(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, address, http.StatusTemporaryRedirect)
 }
 
+// PingGet метод возвращает статус наличия соединения с базой данных.
 func (h *Handler) PingGet(w http.ResponseWriter, r *http.Request) {
 	err := h.strg.CheckPing(h.cfg)
 	if err != nil {

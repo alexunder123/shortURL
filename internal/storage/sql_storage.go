@@ -11,10 +11,12 @@ import (
 	"shortURL/internal/config"
 )
 
+// SQLStorage структура для создания хранилища базы данных.
 type SQLStorage struct {
 	DB *sql.DB
 }
 
+// NewSQLStorager метод генерирует хранилище данных.
 func NewSQLStorager(cfg *config.Config) *SQLStorage {
 	db, err := sql.Open("pgx", cfg.DatabaseDSN)
 	if err != nil {
@@ -29,6 +31,7 @@ func NewSQLStorager(cfg *config.Config) *SQLStorage {
 	}
 }
 
+// SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
 func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 
@@ -60,6 +63,7 @@ func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (strin
 	return key, nil
 }
 
+// RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
 func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	var value string
 	var deleted bool
@@ -81,6 +85,7 @@ func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	return value, nil
 }
 
+// ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
 func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
 
 	var allURLs = make([]urls, 0)
@@ -113,10 +118,12 @@ func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, e
 	return sb, nil
 }
 
+// CheckPing метод возвращает статус подключения к базе данных.
 func (s *SQLStorage) CheckPing(cfg *config.Config) error {
 	return s.DB.Ping()
 }
 
+// Метод обрабатывает, сохраняет и возвращает batch список сокращенных адресов.
 func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
 	tx, err := s.DB.Begin()
@@ -146,14 +153,7 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Conf
 	return r, nil
 }
 
-func createDB(db *sql.DB) error {
-	_, err := db.Exec("CREATE TABLE IF NOT EXISTS Short_URLs(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
+// CloseDB метод закрывает соединение с хранилищем данных.
 func (s *SQLStorage) CloseDB() {
 	err := s.DB.Close()
 	if err != nil {
@@ -162,6 +162,7 @@ func (s *SQLStorage) CloseDB() {
 	log.Info().Msg("db closed")
 }
 
+// MarkDeleted метод помечает на удаление адреса пользователя в хранилище.
 func (s *SQLStorage) MarkDeleted(keys []string, ids []string) {
 	stmt, err := s.DB.Prepare("UPDATE Short_URLs SET deleted=true WHERE key=$1 AND user_id=$2")
 	if err != nil {
@@ -175,4 +176,12 @@ func (s *SQLStorage) MarkDeleted(keys []string, ids []string) {
 			return
 		}
 	}
+}
+
+func createDB(db *sql.DB) error {
+	_, err := db.Exec("CREATE TABLE IF NOT EXISTS Short_URLs(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
+	if err != nil {
+		return err
+	}
+	return nil
 }

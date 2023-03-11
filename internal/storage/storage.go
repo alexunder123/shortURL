@@ -7,6 +7,7 @@ import (
 	"shortURL/internal/config"
 )
 
+// Storager - интерфейс для работы с хранилищем.
 type Storager interface {
 	SetShortURL(fURL, UserID string, Params *config.Config) (string, error)
 	WriteMultiURL(m []MultiURL, UserID string, P *config.Config) ([]MultiURL, error)
@@ -17,6 +18,7 @@ type Storager interface {
 	MarkDeleted([]string, []string)
 }
 
+// NewStorage метод "Фабрика" для создания хранилища в соответствии с конфигурацией сервиса.
 func NewStorage(cfg *config.Config) Storager {
 	switch cfg.SavePlace {
 	case config.SaveFile:
@@ -44,6 +46,7 @@ type urls struct {
 	OriginalURL string `json:"original_url"`
 }
 
+// MultiURL структура для обработки batch запросов в формате JSON.
 type MultiURL struct {
 	CorrID    string `json:"correlation_id"`
 	OriginURL string `json:"original_url,omitempty"`

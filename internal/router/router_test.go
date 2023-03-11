@@ -51,17 +51,17 @@ func TestRouter(t *testing.T) {
 	handlers := handler.NewHandler(cnfg, storage, deletingWorker)
 	router := NewRouter(handlers)
 	deletingWorker.Run(storage, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
-	l, err := net.Listen("tcp", cnfg.ServerAddress)
+	listener, err := net.Listen("tcp", cnfg.ServerAddress)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ts := httptest.NewUnstartedServer(router)
-	ts.Listener.Close()
-	ts.Listener = l
-	ts.Start()
+	testServer := httptest.NewUnstartedServer(router)
+	testServer.Listener.Close()
+	testServer.Listener = listener
+	testServer.Start()
 
-	defer ts.Close()
+	defer testServer.Close()
 
 	tests := []test{
 		{
@@ -87,7 +87,7 @@ func TestRouter(t *testing.T) {
 	}
 	if cnfg.SavePlace == config.SaveSQL {
 		t.Run("Ping", func(t *testing.T) {
-			request1, err := http.NewRequest(http.MethodGet, ts.URL+"/ping", nil)
+			request1, err := http.NewRequest(http.MethodGet, testServer.URL+"/ping", nil)
 			require.NoError(t, err)
 			result, err := http.DefaultClient.Do(request1)
 			require.NoError(t, err)
@@ -97,22 +97,22 @@ func TestRouter(t *testing.T) {
 		})
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 
 			//POST
-			userResult, c := postURL(ts, t, tt)
+			userResult, c := postURL(testServer, t, test)
 
 			//GET
-			getURL(ts, t, tt, userResult)
+			getURL(testServer, t, test, userResult)
 
 			// GET URLs
-			getUserURLs(ts, t, tt, userResult, c)
+			getUserURLs(testServer, t, test, userResult, c)
 		})
 	}
-	multiURL(ts, t)
+	multiURL(testServer, t)
 
-	DeletedURL(ts, t)
+	DeletedURL(testServer, t)
 	deletingWorker.Stop()
 	log.Println("Done")
 
@@ -212,9 +212,6 @@ func getUserURLs(ts *httptest.Server, t *testing.T, tt test, userResult []byte, 
 	var AllURLs = make([]urls, 0)
 	err = json.Unmarshal(userResult5, &AllURLs)
 	require.NoError(t, err)
-	// for _, u := range AllURLs {
-	// 	log.Println(u.OriginalURL, u.ShortURL)
-	// }
 }
 
 func multiURL(ts *httptest.Server, t *testing.T) {
@@ -252,9 +249,6 @@ func multiURL(ts *httptest.Server, t *testing.T) {
 		multis := make([]multiURL, 2)
 		err = json.Unmarshal(userResult1, &multis)
 		require.NoError(t, err)
-		// for _, u := range multis {
-		// 	log.Println(u.CorrID, u.ShortURL)
-		// }
 	})
 
 }
