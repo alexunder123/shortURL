@@ -37,12 +37,6 @@ var exitCheckAnalyzer = &analysis.Analyzer{
 }
 
 func main() {
-	// os.Exit(0)
-	// appfile, err := os.Executable()
-	// if err != nil {
-	// 	log.Fatal().Err(err).Msg("os.Executable error")
-	// }
-	// data, err := os.ReadFile(filepath.Join(filepath.Dir(appfile), config))
 	data, err := os.ReadFile(config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("os.ReadFile error")
