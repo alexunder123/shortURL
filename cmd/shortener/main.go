@@ -1,6 +1,9 @@
+// go:build -ldflags "-X main.buildVersion=v.0.1.7 -X main.buildDate=02.03.2023 -X main.buildCommit=test"
+
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,7 +19,15 @@ import (
 	"shortURL/internal/worker"
 )
 
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
+
 func main() {
+	fmt.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", buildVersion, buildDate, buildCommit)
+
 	logger.Newlogger()
 	log.Info().Msg("Start program")
 	cnfg, err := config.NewConfig()
@@ -40,7 +51,7 @@ func main() {
 	//требование statictest: "the channel used with signal.Notify should be buffered"
 	sigChan := make(chan os.Signal, 10)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
+loop:
 	//требование statictest: "should use for range instead of for { select {} }"
 	for sig := range sigChan {
 		switch sig {
@@ -48,8 +59,7 @@ func main() {
 			log.Info().Msgf("OS cmd received signal %s", sig)
 			deletingWorker.Stop()
 			strg.CloseDB()
-			os.Exit(0)
-
+			break loop
 		}
 	}
 
