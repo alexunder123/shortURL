@@ -43,7 +43,7 @@ func main() {
 	}
 	var cfg configData
 	if err = json.Unmarshal(data, &cfg); err != nil {
-		log.Fatal().Err(err).Msg("son.Unmarshal error")
+		log.Fatal().Err(err).Msg("json.Unmarshal error")
 	}
 	mychecks := []*analysis.Analyzer{
 		exitCheckAnalyzer,
@@ -79,24 +79,26 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 	var stack []ast.Node
 	ast.Inspect(f, func(n ast.Node) bool {
-		if v, ok := n.(*ast.CallExpr); ok {
-			if fun, ok := v.Fun.(*ast.SelectorExpr); ok && fun.Sel.Name == "Exit" {
-				if len(stack) > 1 {
-					isPack := stack[0]
-					isFunc := stack[1]
-					if isPack.(*ast.File).Name.Name == "main" && isFunc.(*ast.FuncDecl).Name.Name == "main" {
-						fmt.Printf("Should not use os.Exit() direct call %v: ", fset.Position(v.Fun.Pos()))
-						printer.Fprint(os.Stdout, fset, v)
-						fmt.Println()
-					}
-				}
-			}
-		}
 
 		if n == nil {
 			stack = stack[:len(stack)-1]
 		} else {
 			stack = append(stack, n)
+		}
+
+		if v, ok := n.(*ast.CallExpr); ok {
+			if fun, ok := v.Fun.(*ast.SelectorExpr); !ok || fun.Sel.Name != "Exit" {
+				return true
+			}
+			if len(stack) > 1 {
+				isPack := stack[0]
+				isFunc := stack[1]
+				if isPack.(*ast.File).Name.Name == "main" && isFunc.(*ast.FuncDecl).Name.Name == "main" {
+					fmt.Printf("Should not use os.Exit() direct call %v: ", fset.Position(v.Fun.Pos()))
+					printer.Fprint(os.Stdout, fset, v)
+					fmt.Println()
+				}
+			}
 		}
 
 		return true

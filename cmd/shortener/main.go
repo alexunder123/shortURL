@@ -1,3 +1,5 @@
+// go:build -ldflags "-X main.buildVersion=v.0.1.7 -X main.buildDate=02.03.2023 -X main.buildCommit=test"
+
 package main
 
 import (
@@ -24,7 +26,6 @@ var (
 )
 
 func main() {
-
 	fmt.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", buildVersion, buildDate, buildCommit)
 
 	logger.Newlogger()
