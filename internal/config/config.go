@@ -82,6 +82,7 @@ func NewConfig() (*Config, error) {
 	return &config, nil
 }
 
+// NewSertificate генерирует сертификат и приватный ключ для запуска HTTPS сервера.
 func NewSertificate(cnfg *Config) (string, string, error) {
 	certDir := "../../temp/cert.pem"
 	pKeyDir := "../../temp/private_key.pem"
