@@ -42,9 +42,20 @@ func main() {
 	log.Debug().Msg("handler init")
 	deletingWorker.Run(strg, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
 	go func() {
-		err := http.ListenAndServe(cnfg.ServerAddress, router)
-		if err != nil {
-			log.Fatal().Msgf("server failed: %s", err)
+		if cnfg.EnableHTTPS {
+			cert, privateKey, err := config.NewSertificate(cnfg)
+			if err != nil {
+				log.Fatal().Err(err).Msg("NewSertificate generating error")
+			}
+			err = http.ListenAndServeTLS(cnfg.ServerAddress, cert, privateKey, router)
+			if err != nil {
+				log.Fatal().Msgf("server failed: %s", err)
+			}
+		} else {
+			err = http.ListenAndServe(cnfg.ServerAddress, router)
+			if err != nil {
+				log.Fatal().Msgf("server failed: %s", err)
+			}
 		}
 	}()
 
