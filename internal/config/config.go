@@ -2,11 +2,13 @@
 package config
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"log"
@@ -34,14 +36,15 @@ const (
 
 // Config хранит основные параметры конфигурации сервиса.
 type Config struct {
-	ServerAddress         string `env:"SERVER_ADDRESS"`
-	BaseURL               string `env:"BASE_URL"`
-	FileStoragePath       string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN           string `env:"DATABASE_DSN"`
-	EnableHTTPS           bool   `env:"ENABLE_HTTPS"`
-	SavePlace             SaveMethod
-	DeletingBufferSize    int
-	DeletingBufferTimeout time.Duration
+	ServerAddress         string        `env:"SERVER_ADDRESS" json:"server_address"`
+	BaseURL               string        `env:"BASE_URL" json:"base_url"`
+	FileStoragePath       string        `env:"FILE_STORAGE_PATH" json:"file_storage_path"`
+	DatabaseDSN           string        `env:"DATABASE_DSN" json:"database_dsn"`
+	EnableHTTPS           bool          `env:"ENABLE_HTTPS" json:"enable_https"`
+	Config                string        `env:"CONFIG" json:"-"`
+	SavePlace             SaveMethod    `json:"-"`
+	DeletingBufferSize    int           `json:"-"`
+	DeletingBufferTimeout time.Duration `json:"-"`
 }
 
 // NewConfig считывает основные параметры и генерирует структуру Config.
@@ -68,7 +71,17 @@ func NewConfig() (*Config, error) {
 	if !config.EnableHTTPS {
 		flag.BoolVar(&config.EnableHTTPS, "s", false, "Вариант запуска HTTPS сервера")
 	}
+	if config.Config == "" {
+		flag.StringVar(&config.Config, "c,config", "", "Файл конфигурации")
+	}
 	flag.Parse()
+
+	if config.Config != "" {
+		err = ReadConfigFile(&config)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if config.DatabaseDSN != "" {
 		config.SavePlace = SaveSQL
@@ -162,4 +175,46 @@ func NewSertificate(cnfg *Config) (string, string, error) {
 	}
 
 	return certDir, pKeyDir, nil
+}
+
+// ReadConfigFile считывает указанный файл конфигурации сервера.
+// Значения из файла конфигурации применяются в последнюю очередь.
+func ReadConfigFile(config *Config) error {
+	file, err := os.Open(config.Config)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	stat, err := file.Stat()
+	if err != nil {
+		return err
+	}
+
+	bytes := make([]byte, stat.Size())
+	r := bufio.NewReader(file)
+	_, err = r.Read(bytes)
+	if err != nil {
+		return err
+	}
+	var fileConf Config
+	err = json.Unmarshal(bytes, &fileConf)
+	if err != nil {
+		return err
+	}
+	if config.ServerAddress == "" {
+		config.ServerAddress = fileConf.ServerAddress
+	}
+	if config.BaseURL == "" {
+		config.BaseURL = fileConf.BaseURL
+	}
+	if config.FileStoragePath == "" {
+		config.FileStoragePath = fileConf.FileStoragePath
+	}
+	if config.DatabaseDSN == "" {
+		config.DatabaseDSN = fileConf.DatabaseDSN
+	}
+	if !config.EnableHTTPS {
+		config.EnableHTTPS = fileConf.EnableHTTPS
+	}
+	return nil
 }
