@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -42,22 +41,24 @@ func main() {
 	router := router.NewRouter(hndlr)
 	log.Debug().Msg("handler init")
 	deletingWorker.Run(strg, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
-	srv := http.Server{
-		Addr:    cnfg.ServerAddress,
-		Handler: router,
-	}
+	// srv := http.Server{
+	// 	Addr:    cnfg.ServerAddress,
+	// 	Handler: router,
+	// }
 	go func() {
 		if cnfg.EnableHTTPS {
 			cert, privateKey, err := config.NewSertificate(cnfg)
 			if err != nil {
 				log.Fatal().Err(err).Msg("NewSertificate generating error")
 			}
-			err = srv.ListenAndServeTLS(cert, privateKey)
+			// err = srv.ListenAndServeTLS(cert, privateKey)
+			err = http.ListenAndServeTLS(cnfg.ServerAddress, cert, privateKey, router)
 			if err != nil {
 				log.Fatal().Msgf("server failed: %s", err)
 			}
 		} else {
-			err = srv.ListenAndServe()
+			// err = srv.ListenAndServe()
+			err = http.ListenAndServe(cnfg.ServerAddress, router)
 			if err != nil {
 				log.Fatal().Msgf("server failed: %s", err)
 			}
@@ -75,10 +76,10 @@ loop:
 			log.Info().Msgf("OS cmd received signal %s", sig)
 			deletingWorker.Stop()
 			strg.CloseDB()
-			if err := srv.Shutdown(context.Background()); err != nil {
-				// Error from closing listeners, or context timeout:
-				log.Printf("HTTP server Shutdown: %v", err)
-			}
+			// if err := srv.Shutdown(context.Background()); err != nil {
+			// 	// Error from closing listeners, or context timeout:
+			// 	log.Printf("HTTP server Shutdown: %v", err)
+			// }
 			break loop
 		}
 	}
