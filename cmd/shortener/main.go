@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -41,18 +42,22 @@ func main() {
 	router := router.NewRouter(hndlr)
 	log.Debug().Msg("handler init")
 	deletingWorker.Run(strg, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
+	srv := http.Server{
+		Addr:    cnfg.ServerAddress,
+		Handler: router,
+	}
 	go func() {
 		if cnfg.EnableHTTPS {
 			cert, privateKey, err := config.NewSertificate(cnfg)
 			if err != nil {
 				log.Fatal().Err(err).Msg("NewSertificate generating error")
 			}
-			err = http.ListenAndServeTLS(cnfg.ServerAddress, cert, privateKey, router)
+			err = srv.ListenAndServeTLS(cert, privateKey)
 			if err != nil {
 				log.Fatal().Msgf("server failed: %s", err)
 			}
 		} else {
-			err = http.ListenAndServe(cnfg.ServerAddress, router)
+			err = srv.ListenAndServe()
 			if err != nil {
 				log.Fatal().Msgf("server failed: %s", err)
 			}
@@ -70,6 +75,10 @@ loop:
 			log.Info().Msgf("OS cmd received signal %s", sig)
 			deletingWorker.Stop()
 			strg.CloseDB()
+			if err := srv.Shutdown(context.Background()); err != nil {
+				// Error from closing listeners, or context timeout:
+				log.Printf("HTTP server Shutdown: %v", err)
+			}
 			break loop
 		}
 	}
