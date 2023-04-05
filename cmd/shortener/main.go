@@ -53,13 +53,11 @@ func main() {
 				log.Fatal().Err(err).Msg("NewSertificate generating error")
 			}
 			err = srv.ListenAndServeTLS(cert, privateKey)
-			// err = http.ListenAndServeTLS(cnfg.ServerAddress, cert, privateKey, router)
 			if err != nil {
 				log.Error().Msgf("server failed: %s", err)
 			}
 		} else {
 			err = srv.ListenAndServe()
-			// err = http.ListenAndServe(cnfg.ServerAddress, router)
 			if err != nil {
 				log.Error().Msgf("server failed: %s", err)
 			}
@@ -78,7 +76,7 @@ loop:
 			deletingWorker.Stop()
 			strg.CloseDB()
 			if err := srv.Shutdown(context.Background()); err != nil {
-				log.Printf("HTTP server Shutdown: %v\n", err)
+				log.Error().Msgf("HTTP server Shutdown: %s", err)
 			}
 			break loop
 		}
