@@ -23,6 +23,7 @@ func TestGetEnv(t *testing.T) {
 				DatabaseDSN:           "PostgreSQL:localhost",
 				Config:                "config.json",
 				EnableHTTPS:           true,
+				TrustedSubnet:         "192.168.11.0/24",
 				SavePlace:             SaveSQL,
 				DeletingBufferSize:    10,
 				DeletingBufferTimeout: 100 * time.Millisecond,
@@ -37,6 +38,7 @@ func TestGetEnv(t *testing.T) {
 			os.Setenv("DATABASE_DSN", "PostgreSQL:localhost")
 			os.Setenv("CONFIG", "config.json")
 			os.Setenv("ENABLE_HTTPS", "true")
+			os.Setenv("TRUSTED_SUBNET", "192.168.11.0/24")
 			got, err := NewConfig()
 			require.NoError(t, err)
 			if !reflect.DeepEqual(got, tt.want) {

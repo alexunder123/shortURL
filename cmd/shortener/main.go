@@ -67,19 +67,22 @@ func main() {
 	//требование statictest: "the channel used with signal.Notify should be buffered"
 	sigChan := make(chan os.Signal, 4)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-loop:
+	// loop:
 	//требование statictest: "should use for range instead of for { select {} }"
-	for sig := range sigChan {
-		switch sig {
-		case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-			log.Info().Msgf("OS cmd received signal %s", sig)
-			deletingWorker.Stop()
-			strg.CloseDB()
-			if err := srv.Shutdown(context.Background()); err != nil {
-				log.Error().Msgf("HTTP server Shutdown: %s", err)
-			}
-			break loop
-		}
+	// for sig := range sigChan {
+	// 	switch sig {
+	// 	case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
+
+	// var sig os.Signal
+	<-sigChan
+	// log.Info().Msgf("OS cmd received signal %s", sig)
+	log.Info().Msgf("OS cmd received stop signal")
+	deletingWorker.Stop()
+	strg.CloseDB()
+	if err := srv.Shutdown(context.Background()); err != nil {
+		log.Error().Msgf("HTTP server Shutdown: %s", err)
 	}
+	// break loop
+	// }
 
 }

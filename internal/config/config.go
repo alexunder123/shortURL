@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"flag"
-	"log"
 	"math/big"
 	"net"
 	"os"
@@ -22,6 +21,7 @@ import (
 	mrand "math/rand"
 
 	"github.com/caarlos0/env/v6"
+	"github.com/rs/zerolog/log"
 )
 
 // SaveMethod - определяем тип данных для выбора места хранения данных в зависимости от полученных параметров.
@@ -42,7 +42,9 @@ type Config struct {
 	DatabaseDSN           string        `env:"DATABASE_DSN" json:"database_dsn"`
 	EnableHTTPS           bool          `env:"ENABLE_HTTPS" json:"enable_https"`
 	Config                string        `env:"CONFIG" json:"-"`
+	TrustedSubnet         string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	SavePlace             SaveMethod    `json:"-"`
+	Subnet                net.IPNet     `json:"-"`
 	DeletingBufferSize    int           `json:"-"`
 	DeletingBufferTimeout time.Duration `json:"-"`
 }
@@ -74,6 +76,9 @@ func NewConfig() (*Config, error) {
 	if config.Config == "" {
 		flag.StringVar(&config.Config, "c,config", "", "Файл конфигурации")
 	}
+	if config.TrustedSubnet == "" {
+		flag.StringVar(&config.TrustedSubnet, "t", "", "Доверенная подсеть")
+	}
 	flag.Parse()
 
 	if config.Config != "" {
@@ -87,6 +92,13 @@ func NewConfig() (*Config, error) {
 		config.SavePlace = SaveSQL
 	} else if config.FileStoragePath != "" {
 		config.SavePlace = SaveFile
+	}
+	_, subnet, err := net.ParseCIDR(config.TrustedSubnet)
+	if err != nil {
+		log.Error().Msgf("ParseCIDR parsing error")
+		config.TrustedSubnet = ""
+	} else {
+		config.Subnet = *subnet
 	}
 
 	config.DeletingBufferSize = 10
@@ -128,12 +140,12 @@ func NewSertificate(cnfg *Config) (string, string, error) {
 
 	privateKey, err := rsa.GenerateKey(rand.Reader, 4096)
 	if err != nil {
-		log.Fatal(err)
+		return "", "", err
 	}
 
 	certBytes, err := x509.CreateCertificate(rand.Reader, cert, cert, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		log.Fatal(err)
+		return "", "", err
 	}
 
 	var certPEM bytes.Buffer
@@ -215,6 +227,9 @@ func ReadConfigFile(config *Config) error {
 	}
 	if !config.EnableHTTPS {
 		config.EnableHTTPS = fileConf.EnableHTTPS
+	}
+	if config.TrustedSubnet == "" {
+		config.TrustedSubnet = fileConf.TrustedSubnet
 	}
 	return nil
 }

@@ -23,6 +23,7 @@ func NewRouter(h *handler.Handler) *chi.Mux {
 	r.Post("/", h.URLPost)
 
 	r.Get("/api/user/urls", h.URLsGet)
+	r.Get("/api/internal/stats", h.StatsGet)
 	r.Get("/{id}", h.IDGet)
 	r.Get("/ping", h.PingGet)
 

@@ -13,6 +13,7 @@ type Storager interface {
 	WriteMultiURL(m []MultiURL, UserID string, P *config.Config) ([]MultiURL, error)
 	RetFullURL(key string) (string, error)
 	ReturnAllURLs(UserID string, P *config.Config) ([]byte, error)
+	ReturnStats() ([]byte, error)
 	CheckPing(P *config.Config) error
 	CloseDB()
 	MarkDeleted([]string, []string)
@@ -51,4 +52,9 @@ type MultiURL struct {
 	CorrID    string `json:"correlation_id"`
 	OriginURL string `json:"original_url,omitempty"`
 	ShortURL  string `json:"short_url,omitempty"`
+}
+
+type stats struct {
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
 }

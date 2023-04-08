@@ -178,6 +178,45 @@ func (s *SQLStorage) MarkDeleted(keys []string, ids []string) {
 	}
 }
 
+// ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
+func (s *SQLStorage) ReturnStats() ([]byte, error) {
+	var urls, users int
+
+	row := s.DB.QueryRow("SELECT count(*) FROM Short_URLs")
+	if errors.Is(row.Err(), sql.ErrNoRows) {
+		return nil, ErrNoContent
+	}
+	if row.Err() != nil {
+		return nil, row.Err()
+	}
+	err := row.Scan(&urls)
+	if err != nil {
+		return nil, err
+	}
+
+	row = s.DB.QueryRow("SELECT count(*) FROM Short_URLs GROUP BY user_id")
+	if errors.Is(row.Err(), sql.ErrNoRows) {
+		return nil, ErrNoContent
+	}
+	if row.Err() != nil {
+		return nil, row.Err()
+	}
+	err = row.Scan(&users)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := stats{
+		URLs:  urls,
+		Users: users,
+	}
+	sb, err := json.Marshal(stats)
+	if err != nil {
+		return nil, err
+	}
+	return sb, nil
+}
+
 func createDB(db *sql.DB) error {
 	_, err := db.Exec("CREATE TABLE IF NOT EXISTS Short_URLs(key text, user_id text, value text, deleted boolean, CONSTRAINT unique_query UNIQUE (user_id, value));")
 	if err != nil {

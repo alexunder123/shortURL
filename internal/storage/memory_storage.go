@@ -121,3 +121,22 @@ func (s *MemoryStorage) MarkDeleted(keys []string, ids []string) {
 	}
 	s.Unlock()
 }
+
+// ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
+func (s *MemoryStorage) ReturnStats() ([]byte, error) {
+	temp := make(map[string]bool)
+	for _, v := range s.userURL {
+		if !temp[v] {
+			temp[v] = true
+		}
+	}
+	stats := stats{
+		URLs:  len(s.baseURL),
+		Users: len(temp),
+	}
+	sb, err := json.Marshal(stats)
+	if err != nil {
+		return nil, err
+	}
+	return sb, nil
+}

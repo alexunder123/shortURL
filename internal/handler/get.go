@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"net"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -62,4 +63,33 @@ func (h *Handler) PingGet(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
+}
+
+// StatsGet метод возвращает количество сокращенных URL и пользователей в сервисе.
+func (h *Handler) StatsGet(w http.ResponseWriter, r *http.Request) {
+	if h.cfg.TrustedSubnet == "" {
+		log.Error().Msgf("TrustedSubnet isn't determined")
+		http.Error(w, "TrustedSubnet isn't determined", http.StatusForbidden)
+		return
+	}
+	userIP := net.ParseIP(r.Header.Get("X-Real-IP"))
+	if userIP == nil {
+		log.Error().Msgf("User IP-address not resolved")
+		http.Error(w, "User IP-address not resolved", http.StatusBadRequest)
+		return
+	}
+	if !h.cfg.Subnet.Contains(userIP) {
+		log.Error().Msgf("User IP-address isn't CIDR subnet")
+		http.Error(w, "User IP-address isn't CIDR subnet", http.StatusForbidden)
+		return
+	}
+
+	statsBZ, err := h.strg.ReturnStats()
+	if err != nil {
+		log.Error().Err(err).Msg("ReturnStats error")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write(statsBZ)
 }
