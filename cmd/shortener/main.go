@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -41,15 +42,30 @@ func main() {
 	router := router.NewRouter(hndlr)
 	log.Debug().Msg("handler init")
 	deletingWorker.Run(strg, cnfg.DeletingBufferSize, cnfg.DeletingBufferTimeout)
+	srv := http.Server{
+		Addr:    cnfg.ServerAddress,
+		Handler: router,
+	}
 	go func() {
-		err := http.ListenAndServe(cnfg.ServerAddress, router)
-		if err != nil {
-			log.Fatal().Msgf("server failed: %s", err)
+		if cnfg.EnableHTTPS {
+			cert, privateKey, err := config.NewSertificate(cnfg)
+			if err != nil {
+				log.Fatal().Err(err).Msg("NewSertificate generating error")
+			}
+			err = srv.ListenAndServeTLS(cert, privateKey)
+			if err != nil {
+				log.Error().Msgf("server failed: %s", err)
+			}
+		} else {
+			err = srv.ListenAndServe()
+			if err != nil {
+				log.Error().Msgf("server failed: %s", err)
+			}
 		}
 	}()
 
 	//требование statictest: "the channel used with signal.Notify should be buffered"
-	sigChan := make(chan os.Signal, 10)
+	sigChan := make(chan os.Signal, 4)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 loop:
 	//требование statictest: "should use for range instead of for { select {} }"
@@ -59,6 +75,9 @@ loop:
 			log.Info().Msgf("OS cmd received signal %s", sig)
 			deletingWorker.Stop()
 			strg.CloseDB()
+			if err := srv.Shutdown(context.Background()); err != nil {
+				log.Error().Msgf("HTTP server Shutdown: %s", err)
+			}
 			break loop
 		}
 	}

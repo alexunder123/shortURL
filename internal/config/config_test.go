@@ -21,6 +21,8 @@ func TestGetEnv(t *testing.T) {
 				BaseURL:               "http://127.0.0.1:8080",
 				FileStoragePath:       "json_storage.json",
 				DatabaseDSN:           "PostgreSQL:localhost",
+				Config:                "config.json",
+				EnableHTTPS:           true,
 				SavePlace:             SaveSQL,
 				DeletingBufferSize:    10,
 				DeletingBufferTimeout: 100 * time.Millisecond,
@@ -33,6 +35,8 @@ func TestGetEnv(t *testing.T) {
 			os.Setenv("BASE_URL", "http://127.0.0.1:8080")
 			os.Setenv("FILE_STORAGE_PATH", "json_storage.json")
 			os.Setenv("DATABASE_DSN", "PostgreSQL:localhost")
+			os.Setenv("CONFIG", "config.json")
+			os.Setenv("ENABLE_HTTPS", "true")
 			got, err := NewConfig()
 			require.NoError(t, err)
 			if !reflect.DeepEqual(got, tt.want) {

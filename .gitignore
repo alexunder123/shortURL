@@ -25,5 +25,5 @@ vendor/
 
 #Temporary files
 $TEMP_FILE
-*.json
+json_storage.json
 *.txt
