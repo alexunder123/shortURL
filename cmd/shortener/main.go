@@ -5,14 +5,20 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 
 	"shortURL/internal/config"
+	pb "shortURL/internal/grpc"
+	"shortURL/internal/grpc/proto"
 	"shortURL/internal/handler"
 	"shortURL/internal/logger"
 	"shortURL/internal/router"
@@ -63,26 +69,30 @@ func main() {
 			}
 		}
 	}()
+	gRPCconf := pb.NewShortURLsServer(cnfg, strg, deletingWorker)
+	gRPCaddr, _, _ := strings.Cut(cnfg.ServerAddress, ":")
+	listen, err := net.Listen("tcp", gRPCaddr+":3200")
+	if err != nil {
+		log.Fatal().Err(err).Msg("gRPC server announce error")
+	}
+	s := grpc.NewServer()
+	proto.RegisterShortURLsServerServer(s, gRPCconf)
+	reflection.Register(s)
+	go func() {
+		if err := s.Serve(listen); err != nil {
+			log.Error().Msgf("gRPC server failed: %s", err)
+		}
+	}()
 
 	//требование statictest: "the channel used with signal.Notify should be buffered"
 	sigChan := make(chan os.Signal, 4)
 	signal.Notify(sigChan, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	// loop:
-	//требование statictest: "should use for range instead of for { select {} }"
-	// for sig := range sigChan {
-	// 	switch sig {
-	// 	case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-
-	// var sig os.Signal
 	<-sigChan
-	// log.Info().Msgf("OS cmd received signal %s", sig)
 	log.Info().Msgf("OS cmd received stop signal")
 	deletingWorker.Stop()
 	strg.CloseDB()
 	if err := srv.Shutdown(context.Background()); err != nil {
 		log.Error().Msgf("HTTP server Shutdown: %s", err)
 	}
-	// break loop
-	// }
-
+	s.GracefulStop()
 }

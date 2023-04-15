@@ -4,6 +4,7 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"shortURL/internal/storage"
 	"time"
 
@@ -89,4 +90,18 @@ func (w *Worker) Stop() {
 	close(w.InputCh)
 	<-w.finished
 	log.Info().Msg("inputCh closed")
+}
+
+// Add метод обрабатывает входящий JSON с данными и добавляет полученные значения
+// в канал обработчика.
+func (w *Worker) Add(urlsBZ []byte, userID string) error {
+	var deleteURLs []string
+	if err := json.Unmarshal(urlsBZ, &deleteURLs); err != nil {
+		return storage.ErrUnsupported
+	}
+	if w.Closed {
+		return storage.ErrUnavailable
+	}
+	w.InputCh <- ToDelete{Keys: deleteURLs, ID: userID}
+	return nil
 }

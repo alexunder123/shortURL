@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -44,6 +45,8 @@ type postURLs struct {
 }
 
 func TestRouter(t *testing.T) {
+	// os.Setenv("DATABASE_DSN", "postgres://postgres:1@localhost:5432/postgres?sslmode=disable")
+	os.Setenv("TRUSTED_SUBNET", "192.168.11.0/24")
 	cnfg, err := config.NewConfig()
 	require.NoError(t, err)
 	storage := storage.NewStorage(cnfg)
@@ -113,6 +116,9 @@ func TestRouter(t *testing.T) {
 	multiURL(testServer, t)
 
 	DeletedURL(testServer, t)
+
+	getStats(testServer, t)
+
 	deletingWorker.Stop()
 	log.Println("Done")
 
@@ -348,4 +354,21 @@ func DeletedURL(ts *httptest.Server, t *testing.T) {
 			require.NoError(t, err)
 		}
 	})
+}
+
+func getStats(ts *httptest.Server, t *testing.T) {
+	request, err := http.NewRequest(http.MethodGet, ts.URL+"/api/internal/stats", nil)
+	require.NoError(t, err)
+	result, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	err = result.Body.Close()
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, result.StatusCode)
+
+	request.Header.Add("X-Real-IP", "192.168.11.22")
+	result, err = http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	err = result.Body.Close()
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, result.StatusCode)
 }

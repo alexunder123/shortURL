@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"net/url"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog/log"
@@ -32,6 +33,7 @@ func NewSQLStorager(cfg *config.Config) *SQLStorage {
 }
 
 // SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
+// Данные передаются и возвращаются текстом в теле запроса.
 func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 
@@ -60,7 +62,59 @@ func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (strin
 			}
 		}
 	}
-	return key, nil
+	return cfg.BaseURL + "/" + key, nil
+}
+
+// SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
+// Данные передаются и возвращаются текстом в теле запроса.
+func (s *SQLStorage) SetShortURLjs(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
+	var addr postURL
+	if err := json.Unmarshal(bytes, &addr); err != nil {
+		return nil, ErrUnsupported
+	}
+	_, err := url.Parse(addr.GetURL)
+	if err != nil {
+		return nil, ErrBadRequest
+	}
+	key := hashStr(addr.GetURL)
+
+	result, err := s.DB.Exec("INSERT INTO Short_URLs(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING",
+		key, userID, addr.GetURL)
+	if err != nil {
+		return nil, err
+	}
+	changes, _ := result.RowsAffected()
+	if changes == 0 {
+		var oldkey string
+		row, err := s.DB.Query("SELECT key FROM Short_URLs WHERE user_id = $1 AND value = $2", userID, addr.GetURL)
+		if err != nil {
+			return nil, err
+		}
+		if err := row.Err(); err != nil {
+			return nil, err
+		}
+		defer row.Close()
+		for row.Next() {
+			err = row.Scan(&oldkey)
+			if err != nil {
+				return nil, err
+			}
+			if oldkey != "" {
+				newAddr := postURL{SetURL: cfg.BaseURL + "/" + oldkey}
+				newAddrBZ, err := json.Marshal(newAddr)
+				if err != nil {
+					return nil, err
+				}
+				return newAddrBZ, ErrConflict
+			}
+		}
+	}
+	newAddr := postURL{SetURL: cfg.BaseURL + "/" + key}
+	newAddrBZ, err := json.Marshal(newAddr)
+	if err != nil {
+		return nil, err
+	}
+	return newAddrBZ, nil
 }
 
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
@@ -124,7 +178,14 @@ func (s *SQLStorage) CheckPing(cfg *config.Config) error {
 }
 
 // Метод обрабатывает, сохраняет и возвращает batch список сокращенных адресов.
-func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
+func (s *SQLStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
+	var m = make([]MultiURL, 0)
+	if err := json.Unmarshal(bytes, &m); err != nil {
+		return nil, ErrUnsupported
+	}
+	if len(m) == 0 {
+		return nil, ErrNoContent
+	}
 	r := make([]MultiURL, len(m))
 	tx, err := s.DB.Begin()
 	if err != nil {
@@ -150,7 +211,11 @@ func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Conf
 		log.Fatal().Msgf("update drivers: unable to commit: %v", err)
 		return nil, err
 	}
-	return r, nil
+	rBZ, err := json.Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	return rBZ, nil
 }
 
 // CloseDB метод закрывает соединение с хранилищем данных.

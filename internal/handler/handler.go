@@ -21,8 +21,3 @@ func NewHandler(cfg *config.Config, strg storage.Storager, wrkr *worker.Worker) 
 		workerDel: wrkr,
 	}
 }
-
-type postURL struct {
-	GetURL string `json:"url,omitempty"`
-	SetURL string `json:"result,omitempty"`
-}

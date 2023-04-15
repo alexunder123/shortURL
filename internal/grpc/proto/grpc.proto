@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package grpc;
+
+option go_package = "grpc/proto";
+
+message UserID {
+  string userID = 1; //строка с идентификатором пользователя
+}
+
+message Status {
+  int32 requestStatus = 1; //строка с кодом ответа соответствующий HTTP методу
+}
+
+message NewURLEntry {
+  string userID = 1; //строка с идентификатором пользователя
+  string entry = 2; //строка с адресом на сокращение
+}
+
+message NewURLResponce {
+  string responce = 1; //строка с сокращенным адресом
+  int32 requestStatus = 2; //строка с кодом ответа соответствующий HTTP методу
+}
+
+message NewJSONEntry {
+  string userID = 1; //строка с идентификатором пользователя
+  bytes entry = 2; //слайс байт (JSON) с адресом на сокращение
+}
+
+message NewJSONResponce {
+  bytes responce = 1; //слайс байт (JSON) с сокращенным адресом
+  int32 requestStatus = 2; //строка с кодом ответа соответствующий HTTP методу
+}
+
+message ShortURL {
+  string userID = 2; //строка с идентификатором пользователя
+  string shortURL = 1; //строка с сокращенным адресом
+}
+
+message FullURL {
+  string fullURL = 1; //строка с полным адресом пользователя
+  int32 requestStatus = 2; //строка с кодом ответа соответствующий HTTP методу
+}
+
+message AllUserURLs {
+  bytes allURLs = 1; //слайс байт (JSON) со списком сокращенных адресов
+  int32 requestStatus = 2; //строка с кодом ответа соответствующий HTTP методу
+}
+
+message Statsrequest {
+  string userIP = 1; //строка с адресом конечного пользователя
+}
+
+message StatsResponce {
+  bytes stats = 1; //слайс байт (JSON) с количеством сокращенных адресов и пользователей
+  int32 requestStatus = 2; //строка с кодом ответа соответствующий HTTP методу
+}
+
+message DeleteURLs {
+  string userID = 1; //строка с идентификатором пользователя
+  bytes toDelete = 2; //слайс байт (JSON) со списком адресов на удаление
+}
+
+message Ping {
+  string ping = 1; //заглушка
+}
+
+service ShortURLsServer {
+  rpc AddShortURL(NewURLEntry) returns (NewURLResponce);
+  rpc AddJSONShortURL(NewJSONEntry) returns (NewJSONResponce);
+  rpc AddBatchShortURL(NewJSONEntry) returns (NewJSONResponce);
+  rpc ReturnURL(ShortURL) returns (FullURL);
+  rpc ReturnUserURLs(UserID) returns (AllUserURLs);
+  rpc ReturnStats(Statsrequest) returns (StatsResponce);
+  rpc PingDB(Ping) returns (Status);
+  rpc MarkToDelete(DeleteURLs) returns (Status);
+}

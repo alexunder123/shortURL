@@ -9,8 +9,9 @@ import (
 
 // Storager - интерфейс для работы с хранилищем.
 type Storager interface {
-	SetShortURL(fURL, UserID string, Params *config.Config) (string, error)
-	WriteMultiURL(m []MultiURL, UserID string, P *config.Config) ([]MultiURL, error)
+	SetShortURL(fURL string, userID string, cfg *config.Config) (string, error)
+	SetShortURLjs(bytes []byte, userID string, cfg *config.Config) ([]byte, error)
+	WriteMultiURL(bytes []byte, UserID string, P *config.Config) ([]byte, error)
 	RetFullURL(key string) (string, error)
 	ReturnAllURLs(UserID string, P *config.Config) ([]byte, error)
 	ReturnStats() ([]byte, error)
@@ -57,4 +58,9 @@ type MultiURL struct {
 type stats struct {
 	URLs  int `json:"urls"`
 	Users int `json:"users"`
+}
+
+type postURL struct {
+	GetURL string `json:"url,omitempty"`
+	SetURL string `json:"result,omitempty"`
 }

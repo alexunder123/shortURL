@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"errors"
+	"net/url"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -28,7 +29,8 @@ func NewMemoryStorager() *MemoryStorage {
 }
 
 // SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
-func (s *MemoryStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
+// Данные передаются и возвращаются текстом в теле запроса.
+func (s *MemoryStorage) SetShortURL(fURL string, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 	s.RLock()
 	id := s.userURL[key]
@@ -41,7 +43,38 @@ func (s *MemoryStorage) SetShortURL(fURL, userID string, cfg *config.Config) (st
 	s.userURL[key] = userID
 	s.deletedURL[key] = false
 	s.Unlock()
-	return key, nil
+	return cfg.BaseURL + "/" + key, nil
+}
+
+// SetShortURLjs метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
+// Данные передаются и возвращаются в формате JSON.
+func (s *MemoryStorage) SetShortURLjs(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
+	var addr postURL
+	if err := json.Unmarshal(bytes, &addr); err != nil {
+		return nil, ErrUnsupported
+	}
+	_, err := url.Parse(addr.GetURL)
+	if err != nil {
+		return nil, ErrBadRequest
+	}
+	key := hashStr(addr.GetURL)
+	s.RLock()
+	id := s.userURL[key]
+	s.RUnlock()
+	newAddr := postURL{SetURL: cfg.BaseURL + "/" + key}
+	newAddrBZ, err := json.Marshal(newAddr)
+	if err != nil {
+		return nil, err
+	}
+	if id == userID {
+		return newAddrBZ, ErrConflict
+	}
+	s.Lock()
+	s.baseURL[key] = addr.GetURL
+	s.userURL[key] = userID
+	s.deletedURL[key] = false
+	s.Unlock()
+	return newAddrBZ, nil
 }
 
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
@@ -91,7 +124,14 @@ func (s *MemoryStorage) CheckPing(cfg *config.Config) error {
 }
 
 // WriteMultiURL метод обрабатывает, сохраняет и возвращает batch список сокращенных адресов.
-func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
+func (s *MemoryStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
+	var m = make([]MultiURL, 0)
+	if err := json.Unmarshal(bytes, &m); err != nil {
+		return nil, ErrUnsupported
+	}
+	if len(m) == 0 {
+		return nil, ErrNoContent
+	}
 	r := make([]MultiURL, len(m))
 	for i, v := range m {
 		key := hashStr(v.OriginURL)
@@ -103,7 +143,11 @@ func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.C
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(cfg.BaseURL + "/" + key)
 	}
-	return r, nil
+	rBZ, err := json.Marshal(r)
+	if err != nil {
+		return nil, err
+	}
+	return rBZ, nil
 }
 
 // CloseDB метод закрывает соединение с хранилищем данных.

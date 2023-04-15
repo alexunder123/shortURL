@@ -44,6 +44,7 @@ func (h *Handler) IDGet(w http.ResponseWriter, r *http.Request) {
 	}
 	if errors.Is(err, storage.ErrNoContent) {
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
+		return
 	}
 	if err != nil {
 		log.Error().Err(err).Msg("IDGet storage error")
@@ -68,25 +69,25 @@ func (h *Handler) PingGet(w http.ResponseWriter, r *http.Request) {
 // StatsGet метод возвращает количество сокращенных URL и пользователей в сервисе.
 func (h *Handler) StatsGet(w http.ResponseWriter, r *http.Request) {
 	if h.cfg.TrustedSubnet == "" {
-		log.Error().Msgf("TrustedSubnet isn't determined")
+		log.Error().Msgf("StatsGet TrustedSubnet isn't determined")
 		http.Error(w, "TrustedSubnet isn't determined", http.StatusForbidden)
 		return
 	}
 	userIP := net.ParseIP(r.Header.Get("X-Real-IP"))
 	if userIP == nil {
-		log.Error().Msgf("User IP-address not resolved")
+		log.Error().Msgf("StatsGet User IP-address not resolved")
 		http.Error(w, "User IP-address not resolved", http.StatusBadRequest)
 		return
 	}
 	if !h.cfg.Subnet.Contains(userIP) {
-		log.Error().Msgf("User IP-address isn't CIDR subnet")
+		log.Error().Msgf("StatsGet User IP-address isn't CIDR subnet")
 		http.Error(w, "User IP-address isn't CIDR subnet", http.StatusForbidden)
 		return
 	}
 
 	statsBZ, err := h.strg.ReturnStats()
 	if err != nil {
-		log.Error().Err(err).Msg("ReturnStats error")
+		log.Error().Err(err).Msg("StatsGet ReturnStats error")
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
