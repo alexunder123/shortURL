@@ -58,7 +58,7 @@ func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (strin
 				return "", err
 			}
 			if oldkey != "" {
-				return oldkey, ErrConflict
+				return cfg.BaseURL + "/" + oldkey, ErrConflict
 			}
 		}
 	}

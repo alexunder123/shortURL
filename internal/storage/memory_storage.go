@@ -36,7 +36,7 @@ func (s *MemoryStorage) SetShortURL(fURL string, userID string, cfg *config.Conf
 	id := s.userURL[key]
 	s.RUnlock()
 	if id == userID {
-		return "", ErrConflict
+		return cfg.BaseURL + "/" + key, ErrConflict
 	}
 	s.Lock()
 	s.baseURL[key] = fURL
