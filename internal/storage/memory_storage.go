@@ -1,9 +1,7 @@
 package storage
 
 import (
-	"encoding/json"
 	"errors"
-	"net/url"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -46,37 +44,6 @@ func (s *MemoryStorage) SetShortURL(fURL string, userID string, cfg *config.Conf
 	return cfg.BaseURL + "/" + key, nil
 }
 
-// SetShortURLjs метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
-// Данные передаются и возвращаются в формате JSON.
-func (s *MemoryStorage) SetShortURLjs(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
-	var addr postURL
-	if err := json.Unmarshal(bytes, &addr); err != nil {
-		return nil, ErrUnsupported
-	}
-	_, err := url.Parse(addr.GetURL)
-	if err != nil {
-		return nil, ErrBadRequest
-	}
-	key := hashStr(addr.GetURL)
-	s.RLock()
-	id := s.userURL[key]
-	s.RUnlock()
-	newAddr := postURL{SetURL: cfg.BaseURL + "/" + key}
-	newAddrBZ, err := json.Marshal(newAddr)
-	if err != nil {
-		return nil, err
-	}
-	if id == userID {
-		return newAddrBZ, ErrConflict
-	}
-	s.Lock()
-	s.baseURL[key] = addr.GetURL
-	s.userURL[key] = userID
-	s.deletedURL[key] = false
-	s.Unlock()
-	return newAddrBZ, nil
-}
-
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
 func (s *MemoryStorage) RetFullURL(key string) (string, error) {
 	s.RLock()
@@ -95,7 +62,7 @@ func (s *MemoryStorage) RetFullURL(key string) (string, error) {
 }
 
 // ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
-func (s *MemoryStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
+func (s *MemoryStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]urls, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
@@ -111,11 +78,7 @@ func (s *MemoryStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte
 	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(allURLs)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return allURLs, nil
 }
 
 // CheckPing метод возвращает статус подключения к базе данных.
@@ -124,14 +87,7 @@ func (s *MemoryStorage) CheckPing(cfg *config.Config) error {
 }
 
 // WriteMultiURL метод обрабатывает, сохраняет и возвращает batch список сокращенных адресов.
-func (s *MemoryStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
-	var m = make([]MultiURL, 0)
-	if err := json.Unmarshal(bytes, &m); err != nil {
-		return nil, ErrUnsupported
-	}
-	if len(m) == 0 {
-		return nil, ErrNoContent
-	}
+func (s *MemoryStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
 	for i, v := range m {
 		key := hashStr(v.OriginURL)
@@ -143,11 +99,7 @@ func (s *MemoryStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.C
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(cfg.BaseURL + "/" + key)
 	}
-	rBZ, err := json.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-	return rBZ, nil
+	return r, nil
 }
 
 // CloseDB метод закрывает соединение с хранилищем данных.
@@ -167,7 +119,7 @@ func (s *MemoryStorage) MarkDeleted(keys []string, ids []string) {
 }
 
 // ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
-func (s *MemoryStorage) ReturnStats() ([]byte, error) {
+func (s *MemoryStorage) ReturnStats() (*stats, error) {
 	temp := make(map[string]bool)
 	for _, v := range s.userURL {
 		if !temp[v] {
@@ -178,9 +130,5 @@ func (s *MemoryStorage) ReturnStats() ([]byte, error) {
 		URLs:  len(s.baseURL),
 		Users: len(temp),
 	}
-	sb, err := json.Marshal(stats)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return &stats, nil
 }

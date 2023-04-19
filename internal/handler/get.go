@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"net"
 	"net/http"
@@ -19,13 +20,14 @@ func (h *Handler) URLsGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
-	urlsBZ, err := h.strg.ReturnAllURLs(userID, h.cfg)
+	urls, err := h.strg.ReturnAllURLs(userID, h.cfg)
 	if errors.Is(err, storage.ErrNoContent) {
 		http.Error(w, err.Error(), http.StatusNoContent)
 		return
 	}
+	urlsBZ, err := json.Marshal(urls)
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("URLsGet json.Marshal error")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -79,16 +81,22 @@ func (h *Handler) StatsGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "User IP-address not resolved", http.StatusBadRequest)
 		return
 	}
-	if !h.cfg.Subnet.Contains(userIP) {
+	if !h.Subnet.Contains(userIP) {
 		log.Error().Msgf("StatsGet User IP-address isn't CIDR subnet")
 		http.Error(w, "User IP-address isn't CIDR subnet", http.StatusForbidden)
 		return
 	}
 
-	statsBZ, err := h.strg.ReturnStats()
+	stats, err := h.strg.ReturnStats()
 	if err != nil {
 		log.Error().Err(err).Msg("StatsGet ReturnStats error")
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	statsBZ, err := json.Marshal(stats)
+	if err != nil {
+		log.Error().Err(err).Msg("StatsGet json.Marshal error")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)

@@ -4,7 +4,6 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
 	"shortURL/internal/storage"
 	"time"
 
@@ -94,14 +93,10 @@ func (w *Worker) Stop() {
 
 // Add метод обрабатывает входящий JSON с данными и добавляет полученные значения
 // в канал обработчика.
-func (w *Worker) Add(urlsBZ []byte, userID string) error {
-	var deleteURLs []string
-	if err := json.Unmarshal(urlsBZ, &deleteURLs); err != nil {
-		return storage.ErrUnsupported
-	}
+func (w *Worker) Add(urls []string, userID string) error {
 	if w.Closed {
 		return storage.ErrUnavailable
 	}
-	w.InputCh <- ToDelete{Keys: deleteURLs, ID: userID}
+	w.InputCh <- ToDelete{Keys: urls, ID: userID}
 	return nil
 }

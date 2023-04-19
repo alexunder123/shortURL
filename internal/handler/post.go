@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -19,27 +20,30 @@ func (h *Handler) BatchNewEtriesPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
-
+	var multiURLs = make([]storage.MultiURL, 0)
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("BatchPost read body err")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	rMultiURLsBZ, err := h.strg.WriteMultiURL(bytes, userID, h.cfg)
-	if errors.Is(err, storage.ErrUnsupported) {
-		log.Error().Err(err).Msg("WriteMultiURL json error")
+	if err = json.Unmarshal(bytes, &multiURLs); err != nil {
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 		return
 	}
-	if errors.Is(err, storage.ErrNoContent) {
-		log.Error().Err(err).Msg("WriteMultiURL json no content")
-		http.Error(w, err.Error(), http.StatusNoContent)
+	if len(multiURLs) == 0 {
+		http.Error(w, "batch URLs empty", http.StatusNoContent)
 		return
 	}
+	rMultiURLs, err := h.strg.WriteMultiURL(multiURLs, userID, h.cfg)
 	if err != nil {
 		log.Error().Err(err).Msg("BatchPost WriteMultiURL err")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rMultiURLsBZ, err := json.Marshal(rMultiURLs)
+	if err != nil {
+		log.Error().Err(err).Msg("BatchPost json.Marshal err")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -55,26 +59,32 @@ func (h *Handler) ShortenPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
-
+	var addr postURL
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost read body err")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	newAddrBZ, err := h.strg.SetShortURLjs(bytes, userID, h.cfg)
-	if errors.Is(err, storage.ErrBadRequest) {
+	if err = json.Unmarshal(bytes, &addr); err != nil {
+		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
+		return
+	}
+	_, err = url.Parse(addr.GetURL)
+	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost url.Parse err")
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 		return
 	}
-	if errors.Is(err, storage.ErrUnsupported) {
-		log.Error().Err(err).Msg("SetShortURL json error")
-		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
-		return
-	}
+	key, err := h.strg.SetShortURL(addr.GetURL, userID, h.cfg)
 	if errors.Is(err, storage.ErrConflict) {
+		newAddr := postURL{SetURL: key}
+		newAddrBZ, err := json.Marshal(newAddr)
+		if err != nil {
+			log.Error().Err(err).Msg("ShortenPost json.Marshal err")
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusConflict)
 		w.Write(newAddrBZ)
@@ -83,6 +93,13 @@ func (h *Handler) ShortenPost(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost SetShortURL err")
 		http.Error(w, "ShortenPost json.Marshal err", http.StatusInternalServerError)
+		return
+	}
+	newAddr := postURL{SetURL: key}
+	newAddrBZ, err := json.Marshal(newAddr)
+	if err != nil {
+		log.Error().Err(err).Msg("ShortenPost json.Marshal err")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

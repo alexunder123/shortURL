@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"net/url"
 	"os"
 	"sync"
 
@@ -55,43 +54,6 @@ func (s *FileStorage) SetShortURL(fURL, userID string, cfg *config.Config) (stri
 	return cfg.BaseURL + "/" + key, err
 }
 
-// SetShortURLjs метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
-// Данные передаются и возвращаются в формате JSON.
-func (s *FileStorage) SetShortURLjs(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
-	var addr postURL
-	if err := json.Unmarshal(bytes, &addr); err != nil {
-		return nil, ErrUnsupported
-	}
-	_, err := url.Parse(addr.GetURL)
-	if err != nil {
-		return nil, ErrBadRequest
-	}
-	key := hashStr(addr.GetURL)
-	s.RLock()
-	id := s.userURL[key]
-	s.RUnlock()
-	newAddr := postURL{SetURL: cfg.BaseURL + "/" + key}
-	newAddrBZ, err := json.Marshal(newAddr)
-	if err != nil {
-		return nil, err
-	}
-	if id == userID {
-		return newAddrBZ, ErrConflict
-	}
-	s.Lock()
-	s.baseURL[key] = addr.GetURL
-	s.userURL[key] = userID
-	s.deletedURL[key] = false
-	s.Unlock()
-	file, err := newWriterFile(cfg)
-	if err != nil {
-		log.Fatal().Err(err).Msg("SetShortURL NewWriterFile err")
-	}
-	defer file.close()
-	err = file.writeFile(key, userID, addr.GetURL)
-	return newAddrBZ, err
-}
-
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
 func (s *FileStorage) RetFullURL(key string) (string, error) {
 	s.RLock()
@@ -110,7 +72,7 @@ func (s *FileStorage) RetFullURL(key string) (string, error) {
 }
 
 // ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
-func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
+func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]urls, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
@@ -126,11 +88,7 @@ func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, 
 	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(allURLs)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return allURLs, nil
 }
 
 // CheckPing метод возвращает статус подключения к базе данных.
@@ -139,14 +97,7 @@ func (s *FileStorage) CheckPing(P *config.Config) error {
 }
 
 // WriteMultiURL метод обрабатывает, сохраняет и возвращает batch список сокращенных адресов.
-func (s *FileStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
-	var m = make([]MultiURL, 0)
-	if err := json.Unmarshal(bytes, &m); err != nil {
-		return nil, ErrUnsupported
-	}
-	if len(m) == 0 {
-		return nil, ErrNoContent
-	}
+func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
 	file, err := newWriterFile(cfg)
 	if err != nil {
@@ -167,11 +118,7 @@ func (s *FileStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.Con
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(cfg.BaseURL + "/" + key)
 	}
-	rBZ, err := json.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-	return rBZ, nil
+	return r, nil
 }
 
 // CloseDB метод закрывает соединение с хранилищем данных.
@@ -191,7 +138,7 @@ func (s *FileStorage) MarkDeleted(keys []string, ids []string) {
 }
 
 // ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
-func (s *FileStorage) ReturnStats() ([]byte, error) {
+func (s *FileStorage) ReturnStats() (*stats, error) {
 	temp := make(map[string]bool)
 	for _, v := range s.userURL {
 		if !temp[v] {
@@ -202,11 +149,7 @@ func (s *FileStorage) ReturnStats() ([]byte, error) {
 		URLs:  len(s.baseURL),
 		Users: len(temp),
 	}
-	sb, err := json.Marshal(stats)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return &stats, nil
 }
 
 type readerFile struct {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -19,12 +20,17 @@ func (h *Handler) URLsDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	var deleteURLs []string
+	if err = json.Unmarshal(urlsBZ, &deleteURLs); err != nil {
+		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
+		return
+	}
 	userID, ok := r.Context().Value(midware.UserID).(string)
 	if !ok {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
-	err = h.workerDel.Add(urlsBZ, userID)
+	err = h.workerDel.Add(deleteURLs, userID)
 	if errors.Is(err, storage.ErrUnsupported) {
 		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
 		return

@@ -2,9 +2,7 @@ package storage
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
-	"net/url"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/rs/zerolog/log"
@@ -65,58 +63,6 @@ func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (strin
 	return cfg.BaseURL + "/" + key, nil
 }
 
-// SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
-// Данные передаются и возвращаются текстом в теле запроса.
-func (s *SQLStorage) SetShortURLjs(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
-	var addr postURL
-	if err := json.Unmarshal(bytes, &addr); err != nil {
-		return nil, ErrUnsupported
-	}
-	_, err := url.Parse(addr.GetURL)
-	if err != nil {
-		return nil, ErrBadRequest
-	}
-	key := hashStr(addr.GetURL)
-
-	result, err := s.DB.Exec("INSERT INTO Short_URLs(key, user_id, value, deleted) VALUES($1, $2, $3, false) ON CONFLICT ON CONSTRAINT unique_query DO NOTHING",
-		key, userID, addr.GetURL)
-	if err != nil {
-		return nil, err
-	}
-	changes, _ := result.RowsAffected()
-	if changes == 0 {
-		var oldkey string
-		row, err := s.DB.Query("SELECT key FROM Short_URLs WHERE user_id = $1 AND value = $2", userID, addr.GetURL)
-		if err != nil {
-			return nil, err
-		}
-		if err := row.Err(); err != nil {
-			return nil, err
-		}
-		defer row.Close()
-		for row.Next() {
-			err = row.Scan(&oldkey)
-			if err != nil {
-				return nil, err
-			}
-			if oldkey != "" {
-				newAddr := postURL{SetURL: cfg.BaseURL + "/" + oldkey}
-				newAddrBZ, err := json.Marshal(newAddr)
-				if err != nil {
-					return nil, err
-				}
-				return newAddrBZ, ErrConflict
-			}
-		}
-	}
-	newAddr := postURL{SetURL: cfg.BaseURL + "/" + key}
-	newAddrBZ, err := json.Marshal(newAddr)
-	if err != nil {
-		return nil, err
-	}
-	return newAddrBZ, nil
-}
-
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
 func (s *SQLStorage) RetFullURL(key string) (string, error) {
 	var value string
@@ -140,7 +86,7 @@ func (s *SQLStorage) RetFullURL(key string) (string, error) {
 }
 
 // ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
-func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
+func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]urls, error) {
 
 	var allURLs = make([]urls, 0)
 	rows, err := s.DB.Query("SELECT key, value FROM Short_URLs WHERE user_id = $1", userID)
@@ -165,11 +111,7 @@ func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, e
 	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(allURLs)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return allURLs, nil
 }
 
 // CheckPing метод возвращает статус подключения к базе данных.
@@ -178,14 +120,7 @@ func (s *SQLStorage) CheckPing(cfg *config.Config) error {
 }
 
 // Метод обрабатывает, сохраняет и возвращает batch список сокращенных адресов.
-func (s *SQLStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.Config) ([]byte, error) {
-	var m = make([]MultiURL, 0)
-	if err := json.Unmarshal(bytes, &m); err != nil {
-		return nil, ErrUnsupported
-	}
-	if len(m) == 0 {
-		return nil, ErrNoContent
-	}
+func (s *SQLStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Config) ([]MultiURL, error) {
 	r := make([]MultiURL, len(m))
 	tx, err := s.DB.Begin()
 	if err != nil {
@@ -211,11 +146,7 @@ func (s *SQLStorage) WriteMultiURL(bytes []byte, userID string, cfg *config.Conf
 		log.Fatal().Msgf("update drivers: unable to commit: %v", err)
 		return nil, err
 	}
-	rBZ, err := json.Marshal(r)
-	if err != nil {
-		return nil, err
-	}
-	return rBZ, nil
+	return r, nil
 }
 
 // CloseDB метод закрывает соединение с хранилищем данных.
@@ -244,7 +175,7 @@ func (s *SQLStorage) MarkDeleted(keys []string, ids []string) {
 }
 
 // ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
-func (s *SQLStorage) ReturnStats() ([]byte, error) {
+func (s *SQLStorage) ReturnStats() (*stats, error) {
 	var urls, users int
 
 	row := s.DB.QueryRow("SELECT count(*) FROM Short_URLs")
@@ -275,11 +206,7 @@ func (s *SQLStorage) ReturnStats() ([]byte, error) {
 		URLs:  urls,
 		Users: users,
 	}
-	sb, err := json.Marshal(stats)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return &stats, nil
 }
 
 func createDB(db *sql.DB) error {

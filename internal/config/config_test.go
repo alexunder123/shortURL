@@ -1,7 +1,6 @@
 package config
 
 import (
-	"net"
 	"os"
 	"reflect"
 	"testing"
@@ -41,9 +40,6 @@ func TestGetEnv(t *testing.T) {
 			os.Setenv("ENABLE_HTTPS", "true")
 			os.Setenv("TRUSTED_SUBNET", "192.168.11.0/24")
 			got, err := NewConfig()
-			require.NoError(t, err)
-			_, subnet, err := net.ParseCIDR(got.TrustedSubnet)
-			tt.want.Subnet = *subnet
 			require.NoError(t, err)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetEnv() = %v, want %v", got, tt.want)

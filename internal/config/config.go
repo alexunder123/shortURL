@@ -44,7 +44,6 @@ type Config struct {
 	Config                string        `env:"CONFIG" json:"-"`
 	TrustedSubnet         string        `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 	SavePlace             SaveMethod    `json:"-"`
-	Subnet                net.IPNet     `json:"-"`
 	DeletingBufferSize    int           `json:"-"`
 	DeletingBufferTimeout time.Duration `json:"-"`
 }
@@ -93,12 +92,10 @@ func NewConfig() (*Config, error) {
 	} else if config.FileStoragePath != "" {
 		config.SavePlace = SaveFile
 	}
-	_, subnet, err := net.ParseCIDR(config.TrustedSubnet)
+	_, _, err = net.ParseCIDR(config.TrustedSubnet)
 	if err != nil {
 		log.Error().Msgf("ParseCIDR parsing error")
 		config.TrustedSubnet = ""
-	} else {
-		config.Subnet = *subnet
 	}
 
 	config.DeletingBufferSize = 10

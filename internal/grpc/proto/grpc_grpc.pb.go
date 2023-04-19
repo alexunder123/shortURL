@@ -20,7 +20,6 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	ShortURLsServer_AddShortURL_FullMethodName      = "/grpc.ShortURLsServer/AddShortURL"
-	ShortURLsServer_AddJSONShortURL_FullMethodName  = "/grpc.ShortURLsServer/AddJSONShortURL"
 	ShortURLsServer_AddBatchShortURL_FullMethodName = "/grpc.ShortURLsServer/AddBatchShortURL"
 	ShortURLsServer_ReturnURL_FullMethodName        = "/grpc.ShortURLsServer/ReturnURL"
 	ShortURLsServer_ReturnUserURLs_FullMethodName   = "/grpc.ShortURLsServer/ReturnUserURLs"
@@ -33,14 +32,14 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ShortURLsServerClient interface {
-	AddShortURL(ctx context.Context, in *NewURLEntry, opts ...grpc.CallOption) (*NewURLResponce, error)
-	AddJSONShortURL(ctx context.Context, in *NewJSONEntry, opts ...grpc.CallOption) (*NewJSONResponce, error)
-	AddBatchShortURL(ctx context.Context, in *NewJSONEntry, opts ...grpc.CallOption) (*NewJSONResponce, error)
-	ReturnURL(ctx context.Context, in *ShortURL, opts ...grpc.CallOption) (*FullURL, error)
-	ReturnUserURLs(ctx context.Context, in *UserID, opts ...grpc.CallOption) (*AllUserURLs, error)
-	ReturnStats(ctx context.Context, in *Statsrequest, opts ...grpc.CallOption) (*StatsResponce, error)
-	PingDB(ctx context.Context, in *Ping, opts ...grpc.CallOption) (*Status, error)
-	MarkToDelete(ctx context.Context, in *DeleteURLs, opts ...grpc.CallOption) (*Status, error)
+	AddShortURL(ctx context.Context, in *NewURLRequest, opts ...grpc.CallOption) (*NewURLResponce, error)
+	// rpc AddJSONShortURL(NewJSONRequest) returns (NewJSONResponce); //исключил, т.к. по сути если не передавать слайс байт, то метод ничем не отличается от AddShortURL
+	AddBatchShortURL(ctx context.Context, in *NewBatchRequest, opts ...grpc.CallOption) (*NewBatchResponce, error)
+	ReturnURL(ctx context.Context, in *ShortURLRequest, opts ...grpc.CallOption) (*FullURLResponce, error)
+	ReturnUserURLs(ctx context.Context, in *UserIDRequest, opts ...grpc.CallOption) (*AllUserURLsResponce, error)
+	ReturnStats(ctx context.Context, in *StatsRequest, opts ...grpc.CallOption) (*StatsResponce, error)
+	PingDB(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*StatusResponce, error)
+	MarkToDelete(ctx context.Context, in *DeleteURLsRequest, opts ...grpc.CallOption) (*StatusResponce, error)
 }
 
 type shortURLsServerClient struct {
@@ -51,7 +50,7 @@ func NewShortURLsServerClient(cc grpc.ClientConnInterface) ShortURLsServerClient
 	return &shortURLsServerClient{cc}
 }
 
-func (c *shortURLsServerClient) AddShortURL(ctx context.Context, in *NewURLEntry, opts ...grpc.CallOption) (*NewURLResponce, error) {
+func (c *shortURLsServerClient) AddShortURL(ctx context.Context, in *NewURLRequest, opts ...grpc.CallOption) (*NewURLResponce, error) {
 	out := new(NewURLResponce)
 	err := c.cc.Invoke(ctx, ShortURLsServer_AddShortURL_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -60,17 +59,8 @@ func (c *shortURLsServerClient) AddShortURL(ctx context.Context, in *NewURLEntry
 	return out, nil
 }
 
-func (c *shortURLsServerClient) AddJSONShortURL(ctx context.Context, in *NewJSONEntry, opts ...grpc.CallOption) (*NewJSONResponce, error) {
-	out := new(NewJSONResponce)
-	err := c.cc.Invoke(ctx, ShortURLsServer_AddJSONShortURL_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *shortURLsServerClient) AddBatchShortURL(ctx context.Context, in *NewJSONEntry, opts ...grpc.CallOption) (*NewJSONResponce, error) {
-	out := new(NewJSONResponce)
+func (c *shortURLsServerClient) AddBatchShortURL(ctx context.Context, in *NewBatchRequest, opts ...grpc.CallOption) (*NewBatchResponce, error) {
+	out := new(NewBatchResponce)
 	err := c.cc.Invoke(ctx, ShortURLsServer_AddBatchShortURL_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -78,8 +68,8 @@ func (c *shortURLsServerClient) AddBatchShortURL(ctx context.Context, in *NewJSO
 	return out, nil
 }
 
-func (c *shortURLsServerClient) ReturnURL(ctx context.Context, in *ShortURL, opts ...grpc.CallOption) (*FullURL, error) {
-	out := new(FullURL)
+func (c *shortURLsServerClient) ReturnURL(ctx context.Context, in *ShortURLRequest, opts ...grpc.CallOption) (*FullURLResponce, error) {
+	out := new(FullURLResponce)
 	err := c.cc.Invoke(ctx, ShortURLsServer_ReturnURL_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -87,8 +77,8 @@ func (c *shortURLsServerClient) ReturnURL(ctx context.Context, in *ShortURL, opt
 	return out, nil
 }
 
-func (c *shortURLsServerClient) ReturnUserURLs(ctx context.Context, in *UserID, opts ...grpc.CallOption) (*AllUserURLs, error) {
-	out := new(AllUserURLs)
+func (c *shortURLsServerClient) ReturnUserURLs(ctx context.Context, in *UserIDRequest, opts ...grpc.CallOption) (*AllUserURLsResponce, error) {
+	out := new(AllUserURLsResponce)
 	err := c.cc.Invoke(ctx, ShortURLsServer_ReturnUserURLs_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -96,7 +86,7 @@ func (c *shortURLsServerClient) ReturnUserURLs(ctx context.Context, in *UserID, 
 	return out, nil
 }
 
-func (c *shortURLsServerClient) ReturnStats(ctx context.Context, in *Statsrequest, opts ...grpc.CallOption) (*StatsResponce, error) {
+func (c *shortURLsServerClient) ReturnStats(ctx context.Context, in *StatsRequest, opts ...grpc.CallOption) (*StatsResponce, error) {
 	out := new(StatsResponce)
 	err := c.cc.Invoke(ctx, ShortURLsServer_ReturnStats_FullMethodName, in, out, opts...)
 	if err != nil {
@@ -105,8 +95,8 @@ func (c *shortURLsServerClient) ReturnStats(ctx context.Context, in *Statsreques
 	return out, nil
 }
 
-func (c *shortURLsServerClient) PingDB(ctx context.Context, in *Ping, opts ...grpc.CallOption) (*Status, error) {
-	out := new(Status)
+func (c *shortURLsServerClient) PingDB(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*StatusResponce, error) {
+	out := new(StatusResponce)
 	err := c.cc.Invoke(ctx, ShortURLsServer_PingDB_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -114,8 +104,8 @@ func (c *shortURLsServerClient) PingDB(ctx context.Context, in *Ping, opts ...gr
 	return out, nil
 }
 
-func (c *shortURLsServerClient) MarkToDelete(ctx context.Context, in *DeleteURLs, opts ...grpc.CallOption) (*Status, error) {
-	out := new(Status)
+func (c *shortURLsServerClient) MarkToDelete(ctx context.Context, in *DeleteURLsRequest, opts ...grpc.CallOption) (*StatusResponce, error) {
+	out := new(StatusResponce)
 	err := c.cc.Invoke(ctx, ShortURLsServer_MarkToDelete_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -127,14 +117,14 @@ func (c *shortURLsServerClient) MarkToDelete(ctx context.Context, in *DeleteURLs
 // All implementations must embed UnimplementedShortURLsServerServer
 // for forward compatibility
 type ShortURLsServerServer interface {
-	AddShortURL(context.Context, *NewURLEntry) (*NewURLResponce, error)
-	AddJSONShortURL(context.Context, *NewJSONEntry) (*NewJSONResponce, error)
-	AddBatchShortURL(context.Context, *NewJSONEntry) (*NewJSONResponce, error)
-	ReturnURL(context.Context, *ShortURL) (*FullURL, error)
-	ReturnUserURLs(context.Context, *UserID) (*AllUserURLs, error)
-	ReturnStats(context.Context, *Statsrequest) (*StatsResponce, error)
-	PingDB(context.Context, *Ping) (*Status, error)
-	MarkToDelete(context.Context, *DeleteURLs) (*Status, error)
+	AddShortURL(context.Context, *NewURLRequest) (*NewURLResponce, error)
+	// rpc AddJSONShortURL(NewJSONRequest) returns (NewJSONResponce); //исключил, т.к. по сути если не передавать слайс байт, то метод ничем не отличается от AddShortURL
+	AddBatchShortURL(context.Context, *NewBatchRequest) (*NewBatchResponce, error)
+	ReturnURL(context.Context, *ShortURLRequest) (*FullURLResponce, error)
+	ReturnUserURLs(context.Context, *UserIDRequest) (*AllUserURLsResponce, error)
+	ReturnStats(context.Context, *StatsRequest) (*StatsResponce, error)
+	PingDB(context.Context, *PingRequest) (*StatusResponce, error)
+	MarkToDelete(context.Context, *DeleteURLsRequest) (*StatusResponce, error)
 	mustEmbedUnimplementedShortURLsServerServer()
 }
 
@@ -142,28 +132,25 @@ type ShortURLsServerServer interface {
 type UnimplementedShortURLsServerServer struct {
 }
 
-func (UnimplementedShortURLsServerServer) AddShortURL(context.Context, *NewURLEntry) (*NewURLResponce, error) {
+func (UnimplementedShortURLsServerServer) AddShortURL(context.Context, *NewURLRequest) (*NewURLResponce, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddShortURL not implemented")
 }
-func (UnimplementedShortURLsServerServer) AddJSONShortURL(context.Context, *NewJSONEntry) (*NewJSONResponce, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddJSONShortURL not implemented")
-}
-func (UnimplementedShortURLsServerServer) AddBatchShortURL(context.Context, *NewJSONEntry) (*NewJSONResponce, error) {
+func (UnimplementedShortURLsServerServer) AddBatchShortURL(context.Context, *NewBatchRequest) (*NewBatchResponce, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddBatchShortURL not implemented")
 }
-func (UnimplementedShortURLsServerServer) ReturnURL(context.Context, *ShortURL) (*FullURL, error) {
+func (UnimplementedShortURLsServerServer) ReturnURL(context.Context, *ShortURLRequest) (*FullURLResponce, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnURL not implemented")
 }
-func (UnimplementedShortURLsServerServer) ReturnUserURLs(context.Context, *UserID) (*AllUserURLs, error) {
+func (UnimplementedShortURLsServerServer) ReturnUserURLs(context.Context, *UserIDRequest) (*AllUserURLsResponce, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnUserURLs not implemented")
 }
-func (UnimplementedShortURLsServerServer) ReturnStats(context.Context, *Statsrequest) (*StatsResponce, error) {
+func (UnimplementedShortURLsServerServer) ReturnStats(context.Context, *StatsRequest) (*StatsResponce, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReturnStats not implemented")
 }
-func (UnimplementedShortURLsServerServer) PingDB(context.Context, *Ping) (*Status, error) {
+func (UnimplementedShortURLsServerServer) PingDB(context.Context, *PingRequest) (*StatusResponce, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PingDB not implemented")
 }
-func (UnimplementedShortURLsServerServer) MarkToDelete(context.Context, *DeleteURLs) (*Status, error) {
+func (UnimplementedShortURLsServerServer) MarkToDelete(context.Context, *DeleteURLsRequest) (*StatusResponce, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MarkToDelete not implemented")
 }
 func (UnimplementedShortURLsServerServer) mustEmbedUnimplementedShortURLsServerServer() {}
@@ -180,7 +167,7 @@ func RegisterShortURLsServerServer(s grpc.ServiceRegistrar, srv ShortURLsServerS
 }
 
 func _ShortURLsServer_AddShortURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NewURLEntry)
+	in := new(NewURLRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -192,31 +179,13 @@ func _ShortURLsServer_AddShortURL_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: ShortURLsServer_AddShortURL_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).AddShortURL(ctx, req.(*NewURLEntry))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _ShortURLsServer_AddJSONShortURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NewJSONEntry)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ShortURLsServerServer).AddJSONShortURL(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: ShortURLsServer_AddJSONShortURL_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).AddJSONShortURL(ctx, req.(*NewJSONEntry))
+		return srv.(ShortURLsServerServer).AddShortURL(ctx, req.(*NewURLRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ShortURLsServer_AddBatchShortURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(NewJSONEntry)
+	in := new(NewBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -228,13 +197,13 @@ func _ShortURLsServer_AddBatchShortURL_Handler(srv interface{}, ctx context.Cont
 		FullMethod: ShortURLsServer_AddBatchShortURL_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).AddBatchShortURL(ctx, req.(*NewJSONEntry))
+		return srv.(ShortURLsServerServer).AddBatchShortURL(ctx, req.(*NewBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ShortURLsServer_ReturnURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ShortURL)
+	in := new(ShortURLRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -246,13 +215,13 @@ func _ShortURLsServer_ReturnURL_Handler(srv interface{}, ctx context.Context, de
 		FullMethod: ShortURLsServer_ReturnURL_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).ReturnURL(ctx, req.(*ShortURL))
+		return srv.(ShortURLsServerServer).ReturnURL(ctx, req.(*ShortURLRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ShortURLsServer_ReturnUserURLs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(UserID)
+	in := new(UserIDRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -264,13 +233,13 @@ func _ShortURLsServer_ReturnUserURLs_Handler(srv interface{}, ctx context.Contex
 		FullMethod: ShortURLsServer_ReturnUserURLs_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).ReturnUserURLs(ctx, req.(*UserID))
+		return srv.(ShortURLsServerServer).ReturnUserURLs(ctx, req.(*UserIDRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ShortURLsServer_ReturnStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Statsrequest)
+	in := new(StatsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -282,13 +251,13 @@ func _ShortURLsServer_ReturnStats_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: ShortURLsServer_ReturnStats_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).ReturnStats(ctx, req.(*Statsrequest))
+		return srv.(ShortURLsServerServer).ReturnStats(ctx, req.(*StatsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ShortURLsServer_PingDB_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(Ping)
+	in := new(PingRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -300,13 +269,13 @@ func _ShortURLsServer_PingDB_Handler(srv interface{}, ctx context.Context, dec f
 		FullMethod: ShortURLsServer_PingDB_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).PingDB(ctx, req.(*Ping))
+		return srv.(ShortURLsServerServer).PingDB(ctx, req.(*PingRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _ShortURLsServer_MarkToDelete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(DeleteURLs)
+	in := new(DeleteURLsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -318,7 +287,7 @@ func _ShortURLsServer_MarkToDelete_Handler(srv interface{}, ctx context.Context,
 		FullMethod: ShortURLsServer_MarkToDelete_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortURLsServerServer).MarkToDelete(ctx, req.(*DeleteURLs))
+		return srv.(ShortURLsServerServer).MarkToDelete(ctx, req.(*DeleteURLsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -333,10 +302,6 @@ var ShortURLsServer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddShortURL",
 			Handler:    _ShortURLsServer_AddShortURL_Handler,
-		},
-		{
-			MethodName: "AddJSONShortURL",
-			Handler:    _ShortURLsServer_AddJSONShortURL_Handler,
 		},
 		{
 			MethodName: "AddBatchShortURL",

@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"net"
-	"net/http"
 	"net/url"
 
 	"github.com/rs/zerolog/log"
 
 	"shortURL/internal/config"
+	"shortURL/internal/grpc/proto"
 	pb "shortURL/internal/grpc/proto"
 	"shortURL/internal/storage"
 	"shortURL/internal/worker"
@@ -21,220 +21,168 @@ type ShortURLsServer struct {
 	cfg       *config.Config
 	strg      storage.Storager
 	workerDel *worker.Worker
+	Subnet    net.IPNet
 }
 
 // NewShortURLsServer генерирует структуру для gRPC сервера.
 func NewShortURLsServer(cfg *config.Config, strg storage.Storager, wrkr *worker.Worker) *ShortURLsServer {
-	return &ShortURLsServer{
+	s := ShortURLsServer{
 		cfg:       cfg,
 		strg:      strg,
 		workerDel: wrkr,
 	}
+	if cfg.TrustedSubnet != "" {
+		_, subnet, _ := net.ParseCIDR(cfg.TrustedSubnet)
+		s.Subnet = *subnet
+	}
+	return &s
 }
 
 // AddShortURL метод принимает от пользователя и возвращает адрес на сокращение.
-func (s *ShortURLsServer) AddShortURL(ctx context.Context, in *pb.NewURLEntry) (*pb.NewURLResponce, error) {
-	var response pb.NewURLResponce
+func (s *ShortURLsServer) AddShortURL(ctx context.Context, in *pb.NewURLRequest) (*pb.NewURLResponce, error) {
 	if in.UserID == "" {
 		log.Error().Msgf("AddShortURL userID empty")
-		response.RequestStatus = http.StatusUnauthorized
-		return &response, storage.ErrUnauthorized
+		return nil, storage.ErrUnauthorized
 	}
 	_, err := url.Parse(in.Entry)
 	if err != nil {
 		log.Error().Err(err).Msg("AddShortURL url.Parse err")
-		response.RequestStatus = http.StatusBadRequest
-		return &response, storage.ErrBadRequest
+		return nil, storage.ErrBadRequest
 	}
 	newAddr, err := s.strg.SetShortURL(in.Entry, in.UserID, s.cfg)
+	var response pb.NewURLResponce
 	if errors.Is(err, storage.ErrConflict) {
 		response.Responce = newAddr
-		response.RequestStatus = http.StatusConflict
 		return &response, storage.ErrConflict
 	}
 	if err != nil {
 		log.Error().Err(err).Msg("AddShortURL storage err")
-		response.RequestStatus = http.StatusInternalServerError
-		return &response, storage.ErrInternalError
+		return nil, storage.ErrInternalError
 	}
 	response.Responce = newAddr
-	response.RequestStatus = http.StatusCreated
-	return &response, nil
-}
-
-// AddJSONShortURL метод принимает от пользователя и возвращает в JSON адрес на сокращение.
-func (s *ShortURLsServer) AddJSONShortURL(ctx context.Context, in *pb.NewJSONEntry) (*pb.NewJSONResponce, error) {
-	var response pb.NewJSONResponce
-	if in.UserID == "" {
-		log.Error().Msgf("AddJSONShortURL userID empty")
-		response.RequestStatus = http.StatusUnauthorized
-		return &response, storage.ErrUnauthorized
-	}
-	newAddrBZ, err := s.strg.SetShortURLjs(in.Entry, in.UserID, s.cfg)
-	if errors.Is(err, storage.ErrBadRequest) {
-		log.Error().Err(err).Msg("AddJSONShortURL url.Parse err")
-		response.RequestStatus = http.StatusBadRequest
-		return &response, storage.ErrBadRequest
-	}
-	if errors.Is(err, storage.ErrUnsupported) {
-		log.Error().Err(err).Msg("AddJSONShortURL json error")
-		response.RequestStatus = http.StatusUnsupportedMediaType
-		return &response, storage.ErrUnsupported
-	}
-	if errors.Is(err, storage.ErrConflict) {
-		response.Responce = newAddrBZ
-		response.RequestStatus = http.StatusConflict
-		return &response, storage.ErrConflict
-	}
-	if err != nil {
-		log.Error().Err(err).Msg("AddJSONShortURL storage err")
-		response.RequestStatus = http.StatusInternalServerError
-		return &response, storage.ErrInternalError
-	}
-	response.Responce = newAddrBZ
-	response.RequestStatus = http.StatusCreated
 	return &response, nil
 }
 
 // AddBatchShortURL метод принимает от пользователя и возвращает в JSON список адресов на сокращение.
-func (s *ShortURLsServer) AddBatchShortURL(ctx context.Context, in *pb.NewJSONEntry) (*pb.NewJSONResponce, error) {
-	var response pb.NewJSONResponce
+func (s *ShortURLsServer) AddBatchShortURL(ctx context.Context, in *pb.NewBatchRequest) (*pb.NewBatchResponce, error) {
 	if in.UserID == "" {
 		log.Error().Msgf("AddBatchShortURL userID empty")
-		response.RequestStatus = http.StatusUnauthorized
-		return &response, storage.ErrUnauthorized
+		return nil, storage.ErrUnauthorized
 	}
-	batchURLsBZ, err := s.strg.WriteMultiURL(in.Entry, in.UserID, s.cfg)
+	if len(in.Request) == 0 {
+		log.Error().Msgf("AddBatchShortURL incoming no content")
+		return nil, storage.ErrNoContent
+	}
+	var batchURLs = make([]storage.MultiURL, len(in.Request), 0)
+	for _, v := range in.Request {
+		batchURLs = append(batchURLs, storage.MultiURL{CorrID: v.CorrID, OriginURL: v.OriginURL})
+	}
+	shortURLs, err := s.strg.WriteMultiURL(batchURLs, in.UserID, s.cfg)
 	if errors.Is(err, storage.ErrUnsupported) {
 		log.Error().Err(err).Msg("AddBatchShortURL json error")
-		response.RequestStatus = http.StatusUnsupportedMediaType
-		return &response, storage.ErrUnsupported
-	}
-	if errors.Is(err, storage.ErrNoContent) {
-		log.Error().Err(err).Msg("AddBatchShortURL json no content")
-		response.RequestStatus = http.StatusNoContent
-		return &response, storage.ErrNoContent
+		return nil, storage.ErrUnsupported
 	}
 	if err != nil {
 		log.Error().Err(err).Msg("AddBatchShortURL storage err")
-		response.RequestStatus = http.StatusInternalServerError
-		return &response, storage.ErrInternalError
+		return nil, storage.ErrInternalError
 	}
-	response.Responce = batchURLsBZ
-	response.RequestStatus = http.StatusCreated
+	var response pb.NewBatchResponce
+	for _, v := range shortURLs {
+		response.Responce = append(response.Responce, &proto.NewBatchResponce_Responce{CorrID: v.CorrID, ShortURL: v.ShortURL})
+	}
 	return &response, nil
 }
 
 // ReturnURL метод возвращает пользователю исходный адрес.
-func (s *ShortURLsServer) ReturnURL(ctx context.Context, in *pb.ShortURL) (*pb.FullURL, error) {
-	var response pb.FullURL
+func (s *ShortURLsServer) ReturnURL(ctx context.Context, in *pb.ShortURLRequest) (*pb.FullURLResponce, error) {
 	address, err := s.strg.RetFullURL(in.ShortURL)
 	if errors.Is(err, storage.ErrGone) {
 		log.Error().Err(err).Msg("ReturnURL address deleted")
-		response.RequestStatus = http.StatusGone
-		return &response, storage.ErrGone
+		return nil, storage.ErrGone
 	}
 	if errors.Is(err, storage.ErrNoContent) {
 		log.Error().Err(err).Msg("ReturnURL address not found")
-		response.RequestStatus = http.StatusBadRequest
-		return &response, storage.ErrNoContent
+		return nil, storage.ErrNoContent
 	}
 	if err != nil {
 		log.Error().Err(err).Msg("ReturnURL storage err")
-		response.RequestStatus = http.StatusInternalServerError
-		return &response, storage.ErrInternalError
+		return nil, storage.ErrInternalError
 	}
+	var response pb.FullURLResponce
 	response.FullURL = address
-	response.RequestStatus = http.StatusTemporaryRedirect
 	return &response, nil
 }
 
 // ReturnURL метод возвращает пользователю список сокращенных им адресов.
-func (s *ShortURLsServer) ReturnUserURLs(ctx context.Context, in *pb.UserID) (*pb.AllUserURLs, error) {
-	var response pb.AllUserURLs
+func (s *ShortURLsServer) ReturnUserURLs(ctx context.Context, in *pb.UserIDRequest) (*pb.AllUserURLsResponce, error) {
 	if in.UserID == "" {
 		log.Error().Msgf("AddBatchShortURL userID empty")
-		response.RequestStatus = http.StatusUnauthorized
-		return &response, storage.ErrUnauthorized
+		return nil, storage.ErrUnauthorized
 	}
-	urlsBZ, err := s.strg.ReturnAllURLs(in.UserID, s.cfg)
+	urls, err := s.strg.ReturnAllURLs(in.UserID, s.cfg)
 	if errors.Is(err, storage.ErrNoContent) {
 		log.Error().Err(err).Msg("ReturnURL address not found")
-		response.RequestStatus = http.StatusBadRequest
-		return &response, storage.ErrNoContent
+		return nil, storage.ErrNoContent
 	}
 	if err != nil {
 		log.Error().Err(err).Msg("ReturnURL storage err")
-		response.RequestStatus = http.StatusInternalServerError
-		return &response, storage.ErrInternalError
+		return nil, storage.ErrInternalError
 	}
-	response.AllURLs = urlsBZ
-	response.RequestStatus = http.StatusOK
+	var response pb.AllUserURLsResponce
+	for _, v := range urls {
+		response.Responce = append(response.Responce, &proto.AllUserURLsResponce_Responce{ShortURL: v.ShortURL, OriginalURL: v.OriginalURL})
+	}
 	return &response, nil
 }
 
 // ReturnStats метод возвращает количество сокращенных URL и пользователей в сервисе.
-func (s *ShortURLsServer) ReturnStats(ctx context.Context, in *pb.Statsrequest) (*pb.StatsResponce, error) {
-	var response pb.StatsResponce
+func (s *ShortURLsServer) ReturnStats(ctx context.Context, in *pb.StatsRequest) (*pb.StatsResponce, error) {
 	if s.cfg.TrustedSubnet == "" {
 		log.Error().Msgf("ReturnStats TrustedSubnet isn't determined")
-		response.RequestStatus = http.StatusForbidden
-		return &response, storage.ErrForbidden
+		return nil, storage.ErrForbidden
 	}
 	userIP := net.ParseIP(in.UserIP)
 	if userIP == nil {
 		log.Error().Msgf("ReturnStats User IP-address not resolved")
-		response.RequestStatus = http.StatusBadRequest
-		return &response, storage.ErrBadRequest
+		return nil, storage.ErrBadRequest
 	}
-	if !s.cfg.Subnet.Contains(userIP) {
+	if !s.Subnet.Contains(userIP) {
 		log.Error().Msgf("ReturnStats User IP-address isn't CIDR subnet")
-		response.RequestStatus = http.StatusForbidden
-		return &response, storage.ErrForbidden
+		return nil, storage.ErrForbidden
 	}
-	statsBZ, err := s.strg.ReturnStats()
+	stats, err := s.strg.ReturnStats()
 	if err != nil {
 		log.Error().Err(err).Msg("ReturnStats storage err")
-		response.RequestStatus = http.StatusInternalServerError
-		return &response, storage.ErrInternalError
+		return nil, storage.ErrInternalError
 	}
-	response.Stats = statsBZ
-	response.RequestStatus = http.StatusOK
+	var response pb.StatsResponce = proto.StatsResponce{URLs: int32(stats.URLs), Users: int32(stats.Users)}
 	return &response, nil
 }
 
 // PingDB метод возвращает статус наличия соединения с базой данных.
-func (s *ShortURLsServer) PingDB(ctx context.Context, in *pb.Ping) (*pb.Status, error) {
-	var response pb.Status
+func (s *ShortURLsServer) PingDB(ctx context.Context, in *pb.PingRequest) (*pb.StatusResponce, error) {
+	var response pb.StatusResponce
 	err := s.strg.CheckPing(s.cfg)
 	if err != nil {
 		log.Error().Err(err).Msg("PingDB DB error")
-		response.RequestStatus = http.StatusInternalServerError
-		return &response, storage.ErrInternalError
+		return nil, storage.ErrInternalError
 	}
-	response.RequestStatus = http.StatusOK
+	response.RequestStatus = "StatusOK"
 	return &response, nil
 }
 
 // PingDB метод возвращает статус наличия соединения с базой данных.
-func (s *ShortURLsServer) MarkToDelete(ctx context.Context, in *pb.DeleteURLs) (*pb.Status, error) {
-	var response pb.Status
+func (s *ShortURLsServer) MarkToDelete(ctx context.Context, in *pb.DeleteURLsRequest) (*pb.StatusResponce, error) {
 	if in.UserID == "" {
 		log.Error().Msgf("MarkToDelete userID empty")
-		response.RequestStatus = http.StatusUnauthorized
-		return &response, storage.ErrUnauthorized
+		return nil, storage.ErrUnauthorized
 	}
 	err := s.workerDel.Add(in.ToDelete, in.UserID)
-	if errors.Is(err, storage.ErrUnsupported) {
-		log.Error().Msgf("MarkToDelete json error")
-		response.RequestStatus = http.StatusUnsupportedMediaType
-		return &response, storage.ErrUnsupported
-	}
 	if errors.Is(err, storage.ErrUnavailable) {
 		log.Error().Msgf("MarkToDelete the server is in the process of stopping")
-		response.RequestStatus = http.StatusServiceUnavailable
-		return &response, storage.ErrUnavailable
+		return nil, storage.ErrUnavailable
 	}
-	response.RequestStatus = http.StatusOK
+	var response pb.StatusResponce
+	response.RequestStatus = "StatusAccepted"
 	return &response, nil
 }
