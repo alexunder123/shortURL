@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"shortURL/internal/config"
-	"shortURL/internal/grpc/proto"
 	pb "shortURL/internal/grpc/proto"
 	"shortURL/internal/storage"
 	"shortURL/internal/worker"
@@ -88,7 +87,7 @@ func (s *ShortURLsServer) AddBatchShortURL(ctx context.Context, in *pb.NewBatchR
 	}
 	var response pb.NewBatchResponce
 	for _, v := range shortURLs {
-		response.Responce = append(response.Responce, &proto.NewBatchResponce_Responce{CorrID: v.CorrID, ShortURL: v.ShortURL})
+		response.Responce = append(response.Responce, &pb.NewBatchResponce_Responce{CorrID: v.CorrID, ShortURL: v.ShortURL})
 	}
 	return &response, nil
 }
@@ -130,7 +129,7 @@ func (s *ShortURLsServer) ReturnUserURLs(ctx context.Context, in *pb.UserIDReque
 	}
 	var response pb.AllUserURLsResponce
 	for _, v := range urls {
-		response.Responce = append(response.Responce, &proto.AllUserURLsResponce_Responce{ShortURL: v.ShortURL, OriginalURL: v.OriginalURL})
+		response.Responce = append(response.Responce, &pb.AllUserURLsResponce_Responce{ShortURL: v.ShortURL, OriginalURL: v.OriginalURL})
 	}
 	return &response, nil
 }
@@ -155,7 +154,7 @@ func (s *ShortURLsServer) ReturnStats(ctx context.Context, in *pb.StatsRequest) 
 		log.Error().Err(err).Msg("ReturnStats storage err")
 		return nil, storage.ErrInternalError
 	}
-	var response pb.StatsResponce = proto.StatsResponce{URLs: int32(stats.URLs), Users: int32(stats.Users)}
+	response := pb.StatsResponce{URLs: int32(stats.URLs), Users: int32(stats.Users)}
 	return &response, nil
 }
 
