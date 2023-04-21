@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"encoding/json"
 	"errors"
 	"sync"
 
@@ -28,20 +27,21 @@ func NewMemoryStorager() *MemoryStorage {
 }
 
 // SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
-func (s *MemoryStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
+// Данные передаются и возвращаются текстом в теле запроса.
+func (s *MemoryStorage) SetShortURL(fURL string, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 	s.RLock()
 	id := s.userURL[key]
 	s.RUnlock()
 	if id == userID {
-		return "", ErrConflict
+		return cfg.BaseURL + "/" + key, ErrConflict
 	}
 	s.Lock()
 	s.baseURL[key] = fURL
 	s.userURL[key] = userID
 	s.deletedURL[key] = false
 	s.Unlock()
-	return key, nil
+	return cfg.BaseURL + "/" + key, nil
 }
 
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
@@ -62,7 +62,7 @@ func (s *MemoryStorage) RetFullURL(key string) (string, error) {
 }
 
 // ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
-func (s *MemoryStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
+func (s *MemoryStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]urls, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
@@ -78,11 +78,7 @@ func (s *MemoryStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte
 	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(allURLs)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return allURLs, nil
 }
 
 // CheckPing метод возвращает статус подключения к базе данных.
@@ -120,4 +116,19 @@ func (s *MemoryStorage) MarkDeleted(keys []string, ids []string) {
 		}
 	}
 	s.Unlock()
+}
+
+// ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
+func (s *MemoryStorage) ReturnStats() (*stats, error) {
+	temp := make(map[string]bool)
+	for _, v := range s.userURL {
+		if !temp[v] {
+			temp[v] = true
+		}
+	}
+	stats := stats{
+		URLs:  len(s.baseURL),
+		Users: len(temp),
+	}
+	return &stats, nil
 }

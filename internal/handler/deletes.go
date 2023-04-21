@@ -2,13 +2,14 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/rs/zerolog/log"
 
 	"shortURL/internal/midware"
-	"shortURL/internal/worker"
+	"shortURL/internal/storage"
 )
 
 // URLsDelete метод обрабатывает запрос на удаление записей сокращенных адресов.
@@ -29,13 +30,15 @@ func (h *Handler) URLsDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "userID empty", http.StatusUnauthorized)
 		return
 	}
-	log.Debug().Msgf("Received URLs to delete: %s", deleteURLs)
-	log.Debug().Msgf("Received ID to delete: %s", userID)
-	if h.workerDel.Closed {
+	err = h.workerDel.Add(deleteURLs, userID)
+	if errors.Is(err, storage.ErrUnsupported) {
+		http.Error(w, err.Error(), http.StatusUnsupportedMediaType)
+		return
+	}
+	if errors.Is(err, storage.ErrUnavailable) {
 		http.Error(w, "the server is in the process of stopping", http.StatusServiceUnavailable)
 		return
 	}
-	h.workerDel.InputCh <- worker.ToDelete{Keys: deleteURLs, ID: userID}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusAccepted)
 	w.Write(nil)

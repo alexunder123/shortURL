@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package grpc;
+
+option go_package = "grpc/proto";
+
+message UserIDRequest {
+  string userID = 1; //строка с идентификатором пользователя
+}
+
+message StatusResponce {
+  string requestStatus = 1; //строка с кодом ответа
+}
+
+message NewURLRequest {
+  string userID = 1; //строка с идентификатором пользователя
+  string entry = 2; //строка с адресом на сокращение
+}
+
+message NewURLResponce {
+  string responce = 1; //строка с сокращенным адресом
+}
+
+message NewBatchRequest {
+  string userID = 1; //строка с идентификатором пользователя
+  message Request {
+    string corrID = 1; //идентификатор адреса
+    string originURL = 2; //адрес на сокращение
+  }
+  repeated Request request = 2; //слайс труктур с адресами на сокращение
+}
+
+message NewBatchResponce {
+  message Responce {
+    string corrID = 1; //идентификатор адреса
+    string shortURL = 2; //строка с сокращенным адресом
+  }
+  repeated Responce responce = 1; //слайс труктур с сокращенными адресами
+}
+
+message ShortURLRequest {
+  string userID = 2; //строка с идентификатором пользователя
+  string shortURL = 1; //строка с сокращенным адресом
+}
+
+message FullURLResponce {
+  string fullURL = 1; //строка с полным адресом пользователя
+}
+
+message AllUserURLsResponce {
+  message Responce {
+    string shortURL = 1; //строка с сокращенным адресом
+    string originalURL = 2; //строка с исходным адресом
+  }
+  repeated Responce responce = 1; //слайс труктур с сокращенными адресами
+}
+
+message StatsRequest {
+  string userIP = 1; //строка с адресом конечного пользователя
+}
+
+message StatsResponce {
+  int32 URLs = 1; //количество адресов
+  int32 users = 2; //количество пользователей
+}
+
+message DeleteURLsRequest {
+  string userID = 1; //строка с идентификатором пользователя
+  repeated string toDelete = 2; //слайс со списком адресов на удаление
+}
+
+message PingRequest {
+  string ping = 1; //заглушка
+}
+
+service ShortURLsServer {
+  rpc AddShortURL(NewURLRequest) returns (NewURLResponce);
+  //rpc AddJSONShortURL(NewJSONRequest) returns (NewJSONResponce); //исключил, т.к. по сути если не передавать слайс байт, то метод ничем не отличается от AddShortURL
+  rpc AddBatchShortURL(NewBatchRequest) returns (NewBatchResponce);
+  rpc ReturnURL(ShortURLRequest) returns (FullURLResponce);
+  rpc ReturnUserURLs(UserIDRequest) returns (AllUserURLsResponce);
+  rpc ReturnStats(StatsRequest) returns (StatsResponce);
+  rpc PingDB(PingRequest) returns (StatusResponce);
+  rpc MarkToDelete(DeleteURLsRequest) returns (StatusResponce);
+}

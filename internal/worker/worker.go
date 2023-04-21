@@ -90,3 +90,13 @@ func (w *Worker) Stop() {
 	<-w.finished
 	log.Info().Msg("inputCh closed")
 }
+
+// Add метод обрабатывает входящий JSON с данными и добавляет полученные значения
+// в канал обработчика.
+func (w *Worker) Add(urls []string, userID string) error {
+	if w.Closed {
+		return storage.ErrUnavailable
+	}
+	w.InputCh <- ToDelete{Keys: urls, ID: userID}
+	return nil
+}

@@ -76,10 +76,9 @@ func (h *Handler) ShortenPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 		return
 	}
-
 	key, err := h.strg.SetShortURL(addr.GetURL, userID, h.cfg)
 	if errors.Is(err, storage.ErrConflict) {
-		newAddr := postURL{SetURL: h.cfg.BaseURL + "/" + key}
+		newAddr := postURL{SetURL: key}
 		newAddrBZ, err := json.Marshal(newAddr)
 		if err != nil {
 			log.Error().Err(err).Msg("ShortenPost json.Marshal err")
@@ -93,10 +92,10 @@ func (h *Handler) ShortenPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost SetShortURL err")
-		http.Error(w, "Wrong address!", http.StatusInternalServerError)
+		http.Error(w, "ShortenPost json.Marshal err", http.StatusInternalServerError)
 		return
 	}
-	newAddr := postURL{SetURL: h.cfg.BaseURL + "/" + key}
+	newAddr := postURL{SetURL: key}
 	newAddrBZ, err := json.Marshal(newAddr)
 	if err != nil {
 		log.Error().Err(err).Msg("ShortenPost json.Marshal err")
@@ -128,11 +127,11 @@ func (h *Handler) URLPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Wrong address!", http.StatusBadRequest)
 		return
 	}
-	key, err := h.strg.SetShortURL(fURL, userID, h.cfg)
+	newAddr, err := h.strg.SetShortURL(fURL, userID, h.cfg)
 	if errors.Is(err, storage.ErrConflict) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(h.cfg.BaseURL + "/" + key))
+		w.Write([]byte(newAddr))
 		return
 	}
 	if err != nil {
@@ -142,5 +141,5 @@ func (h *Handler) URLPost(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(h.cfg.BaseURL + "/" + key))
+	w.Write([]byte(newAddr))
 }

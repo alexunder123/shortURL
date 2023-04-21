@@ -2,7 +2,6 @@ package storage
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -32,6 +31,7 @@ func NewSQLStorager(cfg *config.Config) *SQLStorage {
 }
 
 // SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
+// Данные передаются и возвращаются текстом в теле запроса.
 func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 
@@ -56,11 +56,11 @@ func (s *SQLStorage) SetShortURL(fURL, userID string, cfg *config.Config) (strin
 				return "", err
 			}
 			if oldkey != "" {
-				return oldkey, ErrConflict
+				return cfg.BaseURL + "/" + oldkey, ErrConflict
 			}
 		}
 	}
-	return key, nil
+	return cfg.BaseURL + "/" + key, nil
 }
 
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
@@ -86,7 +86,7 @@ func (s *SQLStorage) RetFullURL(key string) (string, error) {
 }
 
 // ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
-func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
+func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]urls, error) {
 
 	var allURLs = make([]urls, 0)
 	rows, err := s.DB.Query("SELECT key, value FROM Short_URLs WHERE user_id = $1", userID)
@@ -111,11 +111,7 @@ func (s *SQLStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, e
 	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(allURLs)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return allURLs, nil
 }
 
 // CheckPing метод возвращает статус подключения к базе данных.
@@ -176,6 +172,41 @@ func (s *SQLStorage) MarkDeleted(keys []string, ids []string) {
 			return
 		}
 	}
+}
+
+// ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
+func (s *SQLStorage) ReturnStats() (*stats, error) {
+	var urls, users int
+
+	row := s.DB.QueryRow("SELECT count(*) FROM Short_URLs")
+	if errors.Is(row.Err(), sql.ErrNoRows) {
+		return nil, ErrNoContent
+	}
+	if row.Err() != nil {
+		return nil, row.Err()
+	}
+	err := row.Scan(&urls)
+	if err != nil {
+		return nil, err
+	}
+
+	row = s.DB.QueryRow("SELECT count(*) FROM Short_URLs GROUP BY user_id")
+	if errors.Is(row.Err(), sql.ErrNoRows) {
+		return nil, ErrNoContent
+	}
+	if row.Err() != nil {
+		return nil, row.Err()
+	}
+	err = row.Scan(&users)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := stats{
+		URLs:  urls,
+		Users: users,
+	}
+	return &stats, nil
 }
 
 func createDB(db *sql.DB) error {

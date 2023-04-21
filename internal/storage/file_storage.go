@@ -31,13 +31,14 @@ func NewFileStorager(cfg *config.Config) *FileStorage {
 }
 
 // SetShortURL метод генерирует ключ для короткой ссылки, проверяет его наличие и сохраняет данные.
+// Данные передаются и возвращаются текстом в теле запроса.
 func (s *FileStorage) SetShortURL(fURL, userID string, cfg *config.Config) (string, error) {
 	key := hashStr(fURL)
 	s.RLock()
 	id := s.userURL[key]
 	s.RUnlock()
 	if id == userID {
-		return "", ErrConflict
+		return cfg.BaseURL + "/" + key, ErrConflict
 	}
 	s.Lock()
 	s.baseURL[key] = fURL
@@ -50,7 +51,7 @@ func (s *FileStorage) SetShortURL(fURL, userID string, cfg *config.Config) (stri
 	}
 	defer file.close()
 	err = file.writeFile(key, userID, fURL)
-	return key, err
+	return cfg.BaseURL + "/" + key, err
 }
 
 // RetFullURL метод возвращает полный адрес по ключу от короткой ссылки.
@@ -71,7 +72,7 @@ func (s *FileStorage) RetFullURL(key string) (string, error) {
 }
 
 // ReturnAllURLs метод возвращает список сокращенных адресов по ID пользователя.
-func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, error) {
+func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]urls, error) {
 	if len(s.baseURL) == 0 {
 		return nil, ErrNoContent
 	}
@@ -87,11 +88,7 @@ func (s *FileStorage) ReturnAllURLs(userID string, cfg *config.Config) ([]byte, 
 	if len(allURLs) == 0 {
 		return nil, ErrNoContent
 	}
-	sb, err := json.Marshal(allURLs)
-	if err != nil {
-		return nil, err
-	}
-	return sb, nil
+	return allURLs, nil
 }
 
 // CheckPing метод возвращает статус подключения к базе данных.
@@ -121,7 +118,6 @@ func (s *FileStorage) WriteMultiURL(m []MultiURL, userID string, cfg *config.Con
 		r[i].CorrID = v.CorrID
 		r[i].ShortURL = string(cfg.BaseURL + "/" + key)
 	}
-
 	return r, nil
 }
 
@@ -139,6 +135,21 @@ func (s *FileStorage) MarkDeleted(keys []string, ids []string) {
 		}
 	}
 	s.Unlock()
+}
+
+// ReturnStats метод возвращает статистику по количеству сохраненных сокращенных URL и пользователей.
+func (s *FileStorage) ReturnStats() (*stats, error) {
+	temp := make(map[string]bool)
+	for _, v := range s.userURL {
+		if !temp[v] {
+			temp[v] = true
+		}
+	}
+	stats := stats{
+		URLs:  len(s.baseURL),
+		Users: len(temp),
+	}
+	return &stats, nil
 }
 
 type readerFile struct {
